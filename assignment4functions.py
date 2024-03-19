@@ -179,13 +179,17 @@ def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasu
     # last data
     last_date = date.iloc[-1]
 
-    # determine the fractions of a year
-    yearfrac_vector = [yearfrac(data, last_date, 3) for data in date]
+    # determine the yearfractions corresponding to the (business) dates of the returns
+    #yearfrac_vector = [yearfrac(data, last_date, 3) for data in date]
+
+    # Compute the exponents for the lambda coefficients: decreasing in time
+    lambdaExponent = np.arange(n-1, -1, -1)
 
     # compute simulation weights
-    weights_sim = C * np.power(lambda_P, yearfrac_vector)
+    weights_sim = C * np.power(lambda_P, lambdaExponent)
+    print(sum(weights_sim))
 
-    # order losses in descendent way and the respective simulation weights
+    # order losses in decreasing way and the respective simulation weights
     L, weights_sim = zip(*sorted(zip(L, weights_sim), reverse=True))
 
     # find the index that satisfy the constraints
