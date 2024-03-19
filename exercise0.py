@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from assignment4functions import AnalyticalNormalMeasures
+from assignment4functions import price_to_return
 
 # load EUROSTOXX_Dataset
 file_csv = "EUROSTOXX50_Dataset.csv"
@@ -19,6 +20,12 @@ end_date = '2020-02-20'
 Dataset_0 = Dataset_0[(Dataset_0['Date'] <= end_date)]
 Dataset_0 = Dataset_0.reset_index(drop=True)
 
+# fill NA with previous values
+Dataset_0 = Dataset_0.ffill()
+
+# create "matrix" of log-returns
+log_returns = price_to_return(Dataset_0)
+
 # portfolio weights
 weights = np.full(4, 0.25)
 
@@ -34,7 +41,7 @@ days_for_year = 365
 riskMeasureTimeIntervalInDay = years*days_for_year+1
 
 VaR_portfolio, ES_portfolio = AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeIntervalInDay,
-                                                       Dataset_0)
+                                                       log_returns)
 
 print(VaR_portfolio)
 print(ES_portfolio)

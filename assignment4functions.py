@@ -21,7 +21,7 @@ def AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeInte
     # find estimation first date
     end_date = returns.iloc[-1, 0]  # final date
     end_date = pd.to_datetime(end_date)  # convert it to datetime format
-    start_date = end_date - pd.Timedelta(days=riskMeasureTimeIntervalInDay)  # to go back 5 years in time
+    start_date = end_date - pd.Timedelta(days=riskMeasureTimeIntervalInDay - 1)  # to go back 5 years in time
     start_date = start_date.strftime('%Y-%m-%d')
 
     # reduced dataset at the estimation interval
@@ -31,19 +31,12 @@ def AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeInte
     # substitute NaN with previous data (NaN = missing share price)
     returns = returns.ffill()
 
-    # compute the log_returns matrix
-    returns.iloc[:, 1:] = returns.iloc[:, 1:].apply(pd.to_numeric, errors='coerce')
-    log_returns = np.log(returns.iloc[:, 1:] / returns.iloc[:, 1:].shift(1))
-    #log_returns2 = np.log(returns[:, 1:].diff())
-    returns.iloc[:, 1:] = log_returns
-    log_returns = returns.drop(returns.index[0])
-
     # log returns' mean for each analyzed company
-    mu_vector = log_returns.iloc[:, 1:].mean()
+    mu_vector = returns.iloc[:, 1:].mean()
 
     # log returns' standard deviation for each analyzed company
-    std_vector = log_returns.iloc[:, 1:].std()
-    # var_matrix = log_returns.iloc[:, 1:].var()
+    std_vector = returns.iloc[:, 1:].std()
+    # var_matrix = returns.iloc[:, 1:].var()
 
     # portfolio mean
     mu_portfolio = np.dot(weights, mu_vector)
@@ -77,3 +70,19 @@ def AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeInte
     es_value = portfolioValue * ES
 
     return var_value, es_value
+
+def price_to_return(Dataset):
+    """
+    This function computes log returns from share prices.
+
+    :param Dataset:                           share prices
+
+    :return returns:                          log returns
+    """
+
+    # compute the log_returns
+    Dataset.iloc[:, 1:] = Dataset.iloc[:, 1:].apply(pd.to_numeric, errors='coerce')
+    log_returns = np.log(Dataset.iloc[:, 1:] / Dataset.iloc[:, 1:].shift(1))
+    Dataset.iloc[:, 1:] = log_returns
+    returns = Dataset.drop(Dataset.index[0])
+    return returns
