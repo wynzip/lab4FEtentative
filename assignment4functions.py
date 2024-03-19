@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy.stats import t
+import math
 
 
 def AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeIntervalInDay, returns):
@@ -85,4 +86,43 @@ def price_to_return(Dataset):
     log_returns = np.log(Dataset.iloc[:, 1:] / Dataset.iloc[:, 1:].shift(1))
     Dataset.iloc[:, 1:] = log_returns
     returns = Dataset.drop(Dataset.index[0])
+    returns.reset_index(drop=True)
     return returns
+
+def HSMeasurements(returns, alpha, weights, portfolioValue, riskMeasureTimeIntervalInDay):
+    '''
+    This function performs Historical Simulation measurements of Value at Risk and Expected Shortfall
+
+    :param returns:
+    :param alpha:
+    :param weights:
+    :param portfolioValue:
+    :param riskMeasureTimeIntervalInDay:
+    :return:
+    '''
+    
+    # find estimation first date
+    end_date = returns.iloc[-1, 0]  # final date
+    end_date = pd.to_datetime(end_date)  # convert it to datetime format
+    start_date = end_date - pd.Timedelta(days=riskMeasureTimeIntervalInDay - 1)  # to go back 5 years in time
+    start_date = start_date.strftime('%Y-%m-%d')
+    # reduced dataset at the estimation interval
+    returns = returns[(returns['Date'] >= start_date)]
+    returns = returns.reset_index(drop=True)
+
+    # "Simulate" loss distribution
+    loss = - portfolioValue * returns.iloc[:, 1:].to_numpy().dot(weights)
+    # simulated loss distribution using historical log-returns values
+    loss.sort(kind='stable')  # sort loss distribution in increasing order
+    loss = loss[::-1]  # loss distribution changed to decreasing order (worst loss first value)
+    print(loss)
+
+    n = len(loss)  # number of historical returns used --> "size" of loss distribution
+    index = math.floor(n*(1 - alpha))  # index of the loss corresponding to VaR
+
+    VaR = loss[index]
+    print(VaR)
+    expSfall = loss[1:index].mean()  # mean value of the worst losses up to the VaR one
+    print(expSfall)
+
+    return VaR, expSfall

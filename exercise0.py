@@ -24,7 +24,7 @@ Dataset_0 = Dataset_0.reset_index(drop=True)
 Dataset_0 = Dataset_0.ffill()
 
 # create "matrix" of log-returns
-log_returns = price_to_return(Dataset_0)
+log_returns = price_to_return(Dataset_0.copy())
 
 # portfolio weights
 weights = np.full(4, 0.25)
