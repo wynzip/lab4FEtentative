@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 from assignment4functions import price_to_return
 from assignment4functions import HSMeasurements
+from assignment4functions import bootstrapStatistical
+from assignment4functions import WHSMeasurements
 
 
 # load EUROSTOXX_Dataset
@@ -41,7 +43,15 @@ years = 5
 days_for_year = 365
 riskMeasureTimeIntervalInDay = years*days_for_year + 1
 
-VaR_ptf1, ES_ptf1 = HSMeasurements(returns_A, alpha, weights, portfolioValue, riskMeasureTimeIntervalInDay)
+print('Var and ES with historical simulation')
+VaR_HS_ptf1, ES_HS_ptf1 = HSMeasurements(returns_A, alpha, weights, portfolioValue, riskMeasureTimeIntervalInDay)
+
+numberOfSamplesToBootstrap = 200
+samples = bootstrapStatistical(numberOfSamplesToBootstrap, returns_A)
+
+returns_A_bootstrap = returns_A.iloc[samples, :]
+print('Var and ES with statistical bootstrap')
+VaR_bootstrap_ptf1, ES_bootstrap_ptf1 = HSMeasurements(returns_A_bootstrap, alpha, weights, portfolioValue, riskMeasureTimeIntervalInDay)
 
 # name of columns useful for Portfolio B
 columns_name_B = ["Date", "ADSGn.DE", "AIR.PA", "BBVA.MC", "BMWG.DE", "DTEGn.DE"]
@@ -61,6 +71,29 @@ Dataset_B = Dataset_B.ffill()
 
 # compute returns for Portfolio B
 return_B = price_to_return(Dataset_B.copy())
+
+# Portfolio B weights
+weights_B = np.full(5, 0.20)
+
+# significance value
+alpha_B = 0.95
+# historical index
+lambda_B = 0.95
+
+# portfolio value
+portfolioValue_B = np.dot(weights_B, Dataset_B.iloc[-1, 1:])
+
+# estimation interval
+years = 5
+days_for_year = 365
+riskMeasureTimeIntervalInDay_B = years*days_for_year+1
+
+# evaluate VaR and ES for Portfolio B with WHS
+print('Var and ES with weighted historical simulation')
+VaR_B_WHS, ES_B_WHS = WHSMeasurements(return_B, alpha_B, lambda_B, weights_B, portfolioValue_B, riskMeasureTimeIntervalInDay_B)
+
+print(VaR_B_WHS)
+print(ES_B_WHS)
 
 # load indexes.csv
 indexes = pd.read_csv('_indexes.csv')

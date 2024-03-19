@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from scipy.stats import t
 import math
-
+from FE_Library import yearfrac
 
 def AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeIntervalInDay, returns):
     """
@@ -115,7 +115,6 @@ def HSMeasurements(returns, alpha, weights, portfolioValue, riskMeasureTimeInter
     # simulated loss distribution using historical log-returns values
     loss.sort(kind='stable')  # sort loss distribution in increasing order
     loss = loss[::-1]  # loss distribution changed to decreasing order (worst loss first value)
-    print(loss)
 
     n = len(loss)  # number of historical returns used --> "size" of loss distribution
     index = math.floor(n*(1 - alpha))  # index of the loss corresponding to VaR
@@ -126,3 +125,86 @@ def HSMeasurements(returns, alpha, weights, portfolioValue, riskMeasureTimeInter
     print(expSfall)
 
     return VaR, expSfall
+
+def bootstrapStatistical(numberOfSamplesToBootstrap, returns):
+    """
+    This function samples M numbers from 1 to n.
+
+    :param numberOfSamplesToBootstrap:      number of samples = M
+    :param returns:                         time series of returns of assets in the portfolio
+                                            number of time observations = n
+    :return: samples:                       indexes of returns that were sampled
+    """
+    n = len(returns)
+    samples = np.array([np.random.randint(0, n-1) for _ in range(numberOfSamplesToBootstrap)])
+    return samples
+
+def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasureTimeIntervalInDay):
+    """
+    This function determines VaR and ES of a portfolio using Weighted Historical Simulation
+
+    :param returns:                         returns' matrix
+    :param alpha:                           significance value
+    :param lambda_P:                           historical index
+    :param weights:                         portfolio weights
+    :param portfolioValue:                  notional
+    :param riskMeasureTimeIntervalInDay:    estimation interval in day
+    :param returns:                         returns' matrix
+
+    :return: VaR:                           Value at Risk with WHS
+    :return: ES:                            Expected Shortfall with WHS
+    """
+
+    # find estimation first date
+    end_date = returns.iloc[-1, 0]
+    end_date = pd.to_datetime(end_date)
+    start_date = end_date - pd.Timedelta(days=riskMeasureTimeIntervalInDay)
+    start_date = start_date.strftime('%Y-%m-%d')
+
+    # reduced dataset at the estimation interval
+    returns = returns[(returns['Date'] >= start_date)]
+    returns = returns.reset_index(drop=True)
+
+    # observations number
+    n = len(returns)
+
+    # normalization factor
+    C = (1 - lambda_P) / (1 - lambda_P ** n)
+
+    # historical losses
+    L = - portfolioValue * returns.iloc[:, 1:].to_numpy().dot(weights)
+
+    # simulation weights
+    date = pd.to_datetime(returns.iloc[:, 0])
+
+    # last data
+    last_date = date.iloc[-1]
+
+    # determine the fractions of a year
+    yearfrac_vector = [yearfrac(data, last_date, 3) for data in date]
+
+    # compute simulation weights
+    weights_sim = C * np.power(lambda_P, yearfrac_vector)
+
+    # order losses in descendent way and the respective simulation weights
+    L, weights_sim = zip(*sorted(zip(L, weights_sim), reverse=True))
+
+    # find the index that satisfy the constraints
+    # initialize index counter
+    i_temp = 0
+    # initialize sum simulation weights
+    sum_weights_sim = 0
+
+    # while loop to find the index of the weights sum corresponding to 1-alpha
+    while sum_weights_sim <= (1 - alpha):
+        sum_weights_sim += weights_sim[i_temp]
+        i_temp += 1
+    i_star = i_temp - 1
+
+    # compute VaR with WHS
+    VaR_WHS = L[i_star]
+
+    # compute ES with WHS
+    ES_WHS = (np.dot(weights_sim[:i_star], L[:i_star])) / (np.sum(weights_sim[:i_star]))
+
+    return VaR_WHS, ES_WHS
