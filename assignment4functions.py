@@ -4,6 +4,25 @@ from scipy.stats import t
 import math
 from FE_Library import yearfrac
 
+def SliceReturnsFromStartDate(returns, riskMeasureTimeIntervalInDay):
+    """
+    SliceReturnsFromStartDate takes a dataframe of returns and cuts it above start date of computation of risk measures
+    :param returns:
+    :param riskMeasureTimeIntervalInDay:
+    :return:
+    """
+    # find estimation first date
+    endDate = returns.iloc[-1, 0]  # final date
+    endDate = pd.to_datetime(endDate)  # convert it to datetime format
+    startDate = endDate - pd.Timedelta(days=riskMeasureTimeIntervalInDay - 1)  # to go back 5 years in time
+    startDate = startDate.strftime('%Y-%m-%d')
+
+    # reduced dataset at the estimation interval
+    returns = returns[(returns['Date'] >= startDate)]
+    returns = returns.reset_index(drop=True)
+
+    return returns
+
 def AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeIntervalInDay, returns):
     """
     This function determines VaR and ES of a portfolio using the parametric method
@@ -19,15 +38,8 @@ def AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeInte
     :return: ES:                            Expected Shortfall
     """
 
-    # find estimation first date
-    end_date = returns.iloc[-1, 0]  # final date
-    end_date = pd.to_datetime(end_date)  # convert it to datetime format
-    start_date = end_date - pd.Timedelta(days=riskMeasureTimeIntervalInDay - 1)  # to go back 5 years in time
-    start_date = start_date.strftime('%Y-%m-%d')
-
-    # reduced dataset at the estimation interval
-    returns = returns[(returns['Date'] >= start_date)]
-    returns = returns.reset_index(drop=True)
+    # reduce dataset to the estimation interval
+    returns = SliceReturnsFromStartDate(returns.copy(), riskMeasureTimeIntervalInDay)
 
     # substitute NaN with previous data (NaN = missing share price)
     returns = returns.ffill()
@@ -100,15 +112,9 @@ def HSMeasurements(returns, alpha, weights, portfolioValue, riskMeasureTimeInter
     :param riskMeasureTimeIntervalInDay:
     :return:
     '''
-    
-    # find estimation first date
-    end_date = returns.iloc[-1, 0]  # final date
-    end_date = pd.to_datetime(end_date)  # convert it to datetime format
-    start_date = end_date - pd.Timedelta(days=riskMeasureTimeIntervalInDay - 1)  # to go back 5 years in time
-    start_date = start_date.strftime('%Y-%m-%d')
-    # reduced dataset at the estimation interval
-    returns = returns[(returns['Date'] >= start_date)]
-    returns = returns.reset_index(drop=True)
+
+    # reduce dataset to the estimation interval
+    returns = SliceReturnsFromStartDate(returns.copy(), riskMeasureTimeIntervalInDay)
 
     # "Simulate" loss distribution
     loss = - portfolioValue * returns.iloc[:, 1:].to_numpy().dot(weights)
@@ -155,15 +161,8 @@ def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasu
     :return: ES:                            Expected Shortfall with WHS
     """
 
-    # find estimation first date
-    end_date = returns.iloc[-1, 0]
-    end_date = pd.to_datetime(end_date)
-    start_date = end_date - pd.Timedelta(days=riskMeasureTimeIntervalInDay)
-    start_date = start_date.strftime('%Y-%m-%d')
-
-    # reduced dataset at the estimation interval
-    returns = returns[(returns['Date'] >= start_date)]
-    returns = returns.reset_index(drop=True)
+    # reduce dataset to the estimation interval
+    returns = SliceReturnsFromStartDate(returns.copy(), riskMeasureTimeIntervalInDay)
 
     # observations number
     n = len(returns)
@@ -208,3 +207,28 @@ def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasu
     ES_WHS = (np.dot(weights_sim[:i_star], L[:i_star])) / (np.sum(weights_sim[:i_star]))
 
     return VaR_WHS, ES_WHS
+
+
+def plausibilityCheck(returns, portfolioWeights, alpha, portfolioValue, riskMeasureTimeIntervalInDay):
+    """
+    This function performs a plausibility check on the VaR (rule of thumb)
+
+    :param returns:                         returns' matrix
+    :param portfolioWeights:                weights of portfolio = sensitivities
+    :param alpha:                           significance value
+    :param portfolioValue:                  notional
+    :param riskMeasureTimeIntervalInDay:    estimation interval in day
+    :return: VaR:                           Value at Risk
+    """
+
+    # Remove the date from the returns dataFrame and transform it to a numpy array
+    returns = SliceReturnsFromStartDate(returns.copy(), riskMeasureTimeIntervalInDay)
+    returns = returns.iloc[:,1:].to_numpy()
+
+    # Compute upper and lower quantiles of the risk factors distributions (asset returns), one for each asset
+    lowerQuantiles = returns.quantile(alpha)
+    upperQuantiles = returns.quantile(1 - alpha)
+
+    VaR = 0
+
+    return VaR

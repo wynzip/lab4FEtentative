@@ -35,7 +35,6 @@ todayPrices = Dataset_A[Dataset_A['Date'] == end_date]  # take the prices S(t) a
 todayPrices = todayPrices.iloc[:, 1:].to_numpy().reshape(4)  # convert it to numpy array and reshape as sharesNumber (4,)
 
 portfolioValue = (sharesNumber*todayPrices).sum()  # initial value of Portfolio
-print(portfolioValue)
 weights = sharesNumber*todayPrices/portfolioValue  # FROZEN PORTFOLIO assumption
 
 alpha = 0.95
