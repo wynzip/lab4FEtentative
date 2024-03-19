@@ -223,12 +223,20 @@ def plausibilityCheck(returns, portfolioWeights, alpha, portfolioValue, riskMeas
 
     # Remove the date from the returns dataFrame and transform it to a numpy array
     returns = SliceReturnsFromStartDate(returns.copy(), riskMeasureTimeIntervalInDay)
-    returns = returns.iloc[:,1:].to_numpy()
+    returns = returns.iloc[:, 1:].to_numpy()
 
     # Compute upper and lower quantiles of the risk factors distributions (asset returns), one for each asset
-    lowerQuantiles = returns.quantile(alpha)
-    upperQuantiles = returns.quantile(1 - alpha)
+    upperQuantiles = np.quantile(returns, alpha, axis=0)  # axis = 0 to compute one quantile for each column
+    lowerQuantiles = np.quantile(returns, 1 - alpha, axis=0)
 
-    VaR = 0
+    # Compute signedVaR for each risk factor
+    signedVaR = portfolioWeights*(abs(upperQuantiles) + abs(lowerQuantiles))/2
+
+    # Compute Correlation Matrix with command corrcoef
+    CorrelationMatrix = np.corrcoef(returns, rowvar=False)  # rowvar = False means that each columns is a variable
+
+    # Compute VaR according to plausibility check rule of thumb
+    VaR = math.sqrt(signedVaR.transpose().dot(CorrelationMatrix).dot(signedVaR))
+    VaR = VaR*portfolioValue  # multiply for the portfolio value in time t to get reasonable measure
 
     return VaR
