@@ -1,27 +1,39 @@
 import pandas as pd
 import numpy as np
 from scipy.stats import t
+from scipy.stats import norm
 import math
 from FE_Library import yearfrac
 
-def SliceReturnsFromStartDate(returns, riskMeasureTimeIntervalInDay):
+
+def SliceDataFromStartDate(data, endDate, duration):
     """
-    SliceReturnsFromStartDate takes a dataframe of returns and cuts it above start date of computation of risk measures
-    :param returns:
-    :param riskMeasureTimeIntervalInDay:
+    SliceDataFromStartDate takes a dataframe and cuts it above start date of computation of risk measures
+    and after the end date
+    :param data:
+    :param endDate:
+    :param duration:
     :return:
     """
+
+    # reduce dataset up until the end date
+    # endDate = pd.to_datetime(endDate)  # convert it to datetime format
+    data = data[(data['Date'] <= endDate)]
+
     # find estimation first date
-    endDate = returns.iloc[-1, 0]  # final date
-    endDate = pd.to_datetime(endDate)  # convert it to datetime format
-    startDate = endDate - pd.Timedelta(days=riskMeasureTimeIntervalInDay - 1)  # to go back 5 years in time
+    endDate = pd.to_datetime(endDate)
+    startDate = endDate - pd.Timedelta(days=duration)  # to go back 5 years in time
     startDate = startDate.strftime('%Y-%m-%d')
 
     # reduced dataset at the estimation interval
-    returns = returns[(returns['Date'] >= startDate)]
-    returns = returns.reset_index(drop=True)
+    data = data[(data['Date'] >= startDate)]
 
-    return returns
+    # Remove the date from the returns dataFrame and transform it to a numpy array
+    # data = data.iloc[:, 1:].apply(pd.to_numeric, errors='coerce')
+    # data = data.reset_index(drop=True)
+
+    return data
+
 
 def AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeIntervalInDay, returns):
     """
@@ -34,29 +46,23 @@ def AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeInte
     :param riskMeasureTimeIntervalInDay:    estimation interval in day
     :param returns:                         returns' matrix
 
-    :return: VaR:                           Value at Risk
     :return: ES:                            Expected Shortfall
+    :return: VaR:                           Value at Risk
     """
-
-    # reduce dataset to the estimation interval
-    returns = SliceReturnsFromStartDate(returns.copy(), riskMeasureTimeIntervalInDay)
+    # Remove the date from the returns dataFrame and transform it to a numpy array
+    # returns = returns.iloc[:, 1:].apply(pd.to_numeric, errors='coerce')
+    # returns = returns.reset_index(drop=True)
 
     # substitute NaN with previous data (NaN = missing share price)
     returns = returns.ffill()
 
     # log returns' mean for each analyzed company
     mu_vector = returns.iloc[:, 1:].mean()
+    cov_matrix = pd.DataFrame.cov(returns.iloc[:, 1:])
 
-    # log returns' standard deviation for each analyzed company
-    std_vector = returns.iloc[:, 1:].std()
-    # var_matrix = returns.iloc[:, 1:].var()
-
-    # portfolio mean
-    mu_portfolio = np.dot(weights, mu_vector)
-
-    # portfolio std
-
-    std_portfolio = np.dot(weights, std_vector)
+    # assume loss distribution is gaussian
+    mean_loss = weights.dot(mu_vector)
+    cov_loss = (weights.dot(cov_matrix)).dot(weights)
 
     # degrees of freedom
     nu = 4
@@ -65,10 +71,11 @@ def AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeInte
     VaR_std = t.ppf(alpha, df=nu)
 
     # VaR with variance/covariance method
-    VaR = mu_portfolio + std_portfolio * VaR_std
+    VaR = riskMeasureTimeIntervalInDay*mean_loss + math.sqrt(riskMeasureTimeIntervalInDay)*cov_loss * VaR_std
 
     # portfolio VaR
     var_value = portfolioValue * VaR
+    print('VaR:', var_value)
 
     # t-student probability density function
     phi_t = t.pdf(VaR_std, df=nu)
@@ -77,12 +84,14 @@ def AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeInte
     ES_std = ((nu + VaR_std ** 2) / (nu - 1)) * (phi_t / (1 - alpha))
 
     # ES with variance/covariance method
-    ES = mu_portfolio + std_portfolio * ES_std
+    ES = riskMeasureTimeIntervalInDay*mean_loss + math.sqrt(riskMeasureTimeIntervalInDay)*cov_loss * ES_std
 
     # portfolio ES
     es_value = portfolioValue * ES
+    print('ES:', es_value)
 
-    return var_value, es_value
+    return es_value, var_value
+
 
 def price_to_return(Dataset):
     """
@@ -98,11 +107,12 @@ def price_to_return(Dataset):
     log_returns = np.log(Dataset.iloc[:, 1:] / Dataset.iloc[:, 1:].shift(1))
     Dataset.iloc[:, 1:] = log_returns
     returns = Dataset.drop(Dataset.index[0])
-    returns.reset_index(drop=True)
+    returns = returns.reset_index(drop=True)
     return returns
 
+
 def HSMeasurements(returns, alpha, weights, portfolioValue, riskMeasureTimeIntervalInDay):
-    '''
+    """
     This function performs Historical Simulation measurements of Value at Risk and Expected Shortfall
 
     :param returns:
@@ -111,10 +121,7 @@ def HSMeasurements(returns, alpha, weights, portfolioValue, riskMeasureTimeInter
     :param portfolioValue:
     :param riskMeasureTimeIntervalInDay:
     :return:
-    '''
-
-    # reduce dataset to the estimation interval
-    returns = SliceReturnsFromStartDate(returns.copy(), riskMeasureTimeIntervalInDay)
+    """
 
     # "Simulate" loss distribution
     loss = - portfolioValue * returns.iloc[:, 1:].to_numpy().dot(weights)
@@ -125,12 +132,14 @@ def HSMeasurements(returns, alpha, weights, portfolioValue, riskMeasureTimeInter
     n = len(loss)  # number of historical returns used --> "size" of loss distribution
     index = math.floor(n*(1 - alpha))  # index of the loss corresponding to VaR
 
-    VaR = loss[index]
-    print(VaR)
-    expSfall = loss[1:index].mean()  # mean value of the worst losses up to the VaR one
-    print(expSfall)
+    VaR = math.sqrt(riskMeasureTimeIntervalInDay) * loss[index]
+    print('VaR:', VaR)
+    ES = math.sqrt(riskMeasureTimeIntervalInDay)*loss[1:index].mean()
+    # mean value of the worst losses up to the VaR one
+    print('ES:', ES)
 
-    return VaR, expSfall
+    return ES, VaR
+
 
 def bootstrapStatistical(numberOfSamplesToBootstrap, returns):
     """
@@ -145,6 +154,7 @@ def bootstrapStatistical(numberOfSamplesToBootstrap, returns):
     samples = np.array([np.random.randint(0, n-1) for _ in range(numberOfSamplesToBootstrap)])
     return samples
 
+
 def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasureTimeIntervalInDay):
     """
     This function determines VaR and ES of a portfolio using Weighted Historical Simulation
@@ -157,12 +167,9 @@ def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasu
     :param riskMeasureTimeIntervalInDay:    estimation interval in day
     :param returns:                         returns' matrix
 
-    :return: VaR:                           Value at Risk with WHS
     :return: ES:                            Expected Shortfall with WHS
+    :return: VaR:                           Value at Risk with WHS
     """
-
-    # reduce dataset to the estimation interval
-    returns = SliceReturnsFromStartDate(returns.copy(), riskMeasureTimeIntervalInDay)
 
     # observations number
     n = len(returns)
@@ -174,20 +181,19 @@ def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasu
     L = - portfolioValue * returns.iloc[:, 1:].to_numpy().dot(weights)
 
     # simulation weights
-    date = pd.to_datetime(returns.iloc[:, 0])
+    # date = pd.to_datetime(returns.iloc[:, 0])
 
     # last data
-    last_date = date.iloc[-1]
+    # last_date = date.iloc[-1]
 
     # determine the yearfractions corresponding to the (business) dates of the returns
-    #yearfrac_vector = [yearfrac(data, last_date, 3) for data in date]
+    # yearfrac_vector = [yearfrac(data, last_date, 3) for data in date]
 
     # Compute the exponents for the lambda coefficients: decreasing in time
     lambdaExponent = np.arange(n-1, -1, -1)
 
     # compute simulation weights
     weights_sim = C * np.power(lambda_P, lambdaExponent)
-    print(sum(weights_sim))
 
     # order losses in decreasing way and the respective simulation weights
     L, weights_sim = zip(*sorted(zip(L, weights_sim), reverse=True))
@@ -205,12 +211,15 @@ def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasu
     i_star = i_temp - 1
 
     # compute VaR with WHS
-    VaR_WHS = L[i_star]
+    VaR_WHS = math.sqrt(riskMeasureTimeIntervalInDay) * L[i_star]
+    print('VaR:', VaR_WHS)
 
     # compute ES with WHS
-    ES_WHS = (np.dot(weights_sim[:i_star], L[:i_star])) / (np.sum(weights_sim[:i_star]))
+    ES_WHS = (math.sqrt(riskMeasureTimeIntervalInDay) * (np.dot(weights_sim[:i_star], L[:i_star])) /
+              (np.sum(weights_sim[:i_star])))
+    print('ES:', ES_WHS)
 
-    return VaR_WHS, ES_WHS
+    return ES_WHS, VaR_WHS
 
 
 def plausibilityCheck(returns, portfolioWeights, alpha, portfolioValue, riskMeasureTimeIntervalInDay):
@@ -224,10 +233,9 @@ def plausibilityCheck(returns, portfolioWeights, alpha, portfolioValue, riskMeas
     :param riskMeasureTimeIntervalInDay:    estimation interval in day
     :return: VaR:                           Value at Risk
     """
-
     # Remove the date from the returns dataFrame and transform it to a numpy array
-    returns = SliceReturnsFromStartDate(returns.copy(), riskMeasureTimeIntervalInDay)
-    returns = returns.iloc[:, 1:].to_numpy()
+    returns = returns.iloc[:, 1:].apply(pd.to_numeric, errors='coerce')
+    returns = returns.reset_index(drop=True)
 
     # Compute upper and lower quantiles of the risk factors distributions (asset returns), one for each asset
     upperQuantiles = np.quantile(returns, alpha, axis=0)  # axis = 0 to compute one quantile for each column
@@ -237,10 +245,61 @@ def plausibilityCheck(returns, portfolioWeights, alpha, portfolioValue, riskMeas
     signedVaR = portfolioWeights*(abs(upperQuantiles) + abs(lowerQuantiles))/2
 
     # Compute Correlation Matrix with command corrcoef
-    CorrelationMatrix = np.corrcoef(returns, rowvar=False)  # rowvar = False means that each columns is a variable
+    CorrelationMatrix = np.corrcoef(returns, rowvar=False)  # rowvar = False means that each column is a variable
 
     # Compute VaR according to plausibility check rule of thumb
-    VaR = math.sqrt(signedVaR.transpose().dot(CorrelationMatrix).dot(signedVaR))
-    VaR = VaR*portfolioValue  # multiply for the portfolio value in time t to get reasonable measure
+    VaR = (math.sqrt(signedVaR.transpose().dot(CorrelationMatrix).dot(signedVaR)) *
+           math.sqrt(riskMeasureTimeIntervalInDay))
+    VaR_value = VaR*portfolioValue  # multiply for the portfolio value in time t to get reasonable measure
+    print('Plausibility check on VaR:', VaR_value)
 
-    return VaR
+    return VaR_value
+
+
+def PrincCompAnalysis(yearlyCovariance, yearlyMeanReturns, weights, H, alpha, numberOfPrincipalComponents,
+                      portfolioValue):
+    """
+    this function calculates the VaR and the ES via a Gaussian parametric PCA approach
+
+    :param yearlyCovariance:
+    :param yearlyMeanReturns:
+    :param weights:
+    :param H:
+    :param alpha:
+    :param numberOfPrincipalComponents:
+    :param portfolioValue:
+    :return: ES:
+    :return: VaR:
+    """
+    # assume loss distribution is gaussian
+    mean_loss = weights.dot(yearlyMeanReturns)
+    cov_loss = (weights.dot(yearlyCovariance)).dot(weights)
+    VaR_std = norm.ppf(alpha, loc=mean_loss, scale=cov_loss)
+    ES_std = norm.ppf(alpha, loc=mean_loss, scale=cov_loss)/(1-alpha)
+
+    # compute eigenvalues
+    eigenvalues, eigenvectors = np.linalg.eig(yearlyCovariance)
+    # order for decrescent eigenvalues
+    eigenvalues, eigenvectors = zip(*sorted(zip(eigenvalues, eigenvectors.T), reverse=True))
+    eigenvalues = np.diag(eigenvalues)  # make eig into a diag matrix
+    eigenvectors = np.array(eigenvectors).T  # make eigenvectors be  matrix again, it was messed up cause of zip
+
+    # new definitions
+    mu_hat = np.dot(eigenvectors.T, yearlyMeanReturns)
+    weights_hat = np.dot(eigenvectors.T, weights)
+
+    # mean and covariance for reduced form portfolio
+    mu_rfp = sum((weights_hat*mu_hat)[:numberOfPrincipalComponents])
+    sigma_rfp = sum(((weights_hat ** 2).dot(eigenvalues))[:numberOfPrincipalComponents])
+    VaR = H*mu_rfp + math.sqrt(H)*sigma_rfp * VaR_std
+    VaR_value = portfolioValue * VaR
+    print('VaR with PCA:', VaR_value)
+
+    ES = H*mu_rfp + math.sqrt(H)*sigma_rfp * ES_std
+    ES_value = ES * portfolioValue
+    print('ES with PCA:', ES_value)
+
+    return ES_value, VaR_value
+
+
+
