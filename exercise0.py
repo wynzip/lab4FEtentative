@@ -20,7 +20,7 @@ Dataset_0 = Dataset[columns_name]
 end_date = '2020-02-20'
 years = 5
 days_for_year = 365
-time_frame = years*days_for_year + 1
+time_frame = years*days_for_year + 1 # +1 because there's a bisestile year
 Dataset_0 = SliceDataFromStartDate(Dataset_0.copy(), end_date, time_frame)
 
 # fill NA with previous values

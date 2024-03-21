@@ -8,7 +8,7 @@ from assignment4functions import plausibilityCheck
 from assignment4functions import SliceDataFromStartDate
 from assignment4functions import PrincCompAnalysis
 
-
+np.random.seed(42)
 # load EUROSTOXX_Dataset
 file_csv = "EUROSTOXX50_Dataset.csv"
 Dataset = pd.read_csv(file_csv)
@@ -36,7 +36,7 @@ returns_A = price_to_return(Dataset_A.copy())
 
 # working on portfolio A: performing HS and Bootstrap
 sharesNumber = np.array([20e3, 20e3, 25e3, 10e3])  # number of shares bought of each stock - alphabetical order
-todayPrices = Dataset_A[Dataset_A['Date'] == end_date]  # take the prices S(t) at value date ( = end_date)
+todayPrices = Dataset_A[Dataset_A['Date'] == end_date]  # take the prices stockPrice(t) at value date ( = end_date)
 todayPrices = todayPrices.iloc[:, 1:].to_numpy().reshape(len(sharesNumber))
 # convert it to numpy array and reshape as sharesNumber (4,)
 
@@ -141,7 +141,7 @@ mean_vector = mean_vector*buss_days_year
 # Portfolio C weights (since we are investing 1 euro in total)
 sharesNumber_C = np.full(17, 1/17)
 
-todayPrices_C = Dataset_C[Dataset_C['Date'] == end_date]  # take the prices S(t) at value date ( = end_date)
+todayPrices_C = Dataset_C[Dataset_C['Date'] == end_date]  # take the prices stockPrice(t) at value date ( = end_date)
 todayPrices_C = todayPrices_C.iloc[:, 1:].to_numpy().reshape(len(sharesNumber_C))
 # convert it to numpy array and reshape as sharesNumber
 
