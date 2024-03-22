@@ -350,7 +350,7 @@ volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, Number
     weightsSims = weightsSims/np.sum(weightsSims)
 
     # Evaluate vector of new prices in t+delta: one for each simulation
-    vectorStockt1 = stockPrice * np.exp(-10*logRetMC)
+    vectorStockt1 = stockPrice * np.exp(10*logRetMC)
 
     # Black params d1 and d2
     timeToMaturityInYears -= riskMeasureTimeIntervalInYears * NumberOfDaysPerYears / 365
@@ -362,14 +362,14 @@ volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, Number
     vectorCallt1 = vectorStockt1 * np.exp(-dividend * timeToMaturityInYears) * norm.cdf(d1) - strike * np.exp(
         -rate * timeToMaturityInYears) * norm.cdf(d2)
 
-    # Evaluate derivative losses
-    lossDer = - numberOfCalls * (vectorCallt1 - callPrice)
+    # Evaluate derivative losses (Remark: we're shorting the derivative, so we remove the minus)
+    lossDer = numberOfCalls * (vectorCallt1 - callPrice)
 
     # Evaluate stock losses
     lossStock = - numberOfShares * (vectorStockt1 - stockPrice)
 
     # Loss total portfolio
-    lossTotal = lossDer + lossStock
+    lossTotal = np.add(lossDer, lossStock)
 
     # Now I have vector of total losses for each simulation, and I also have the corresponding weights of each
     # simulation stored in the weightsSims vector
@@ -391,8 +391,73 @@ volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, Number
 
     # compute VaR with WHS
     VaR = lossTotal[i_star]
-    # VEDIAMO SE METTERE QUESTA SQRT
-    print('VaR:', VaR)
+    print('VaR:', float(VaR))
 
     return VaR
 
+def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike, rate, dividend,
+                   volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, NumberOfDaysPerYears,
+                    lambdaWHS):
+    """
+    Function to compute full VaR of portfolio with Delta Normal method
+    :param logReturns:
+    :param numberOfShares:
+    :param numberOfCalls:
+    :param stockPrice:
+    :param strike:
+    :param rate:
+    :param dividend:
+    :param volatility:
+    :param timeToMaturityInYears:
+    :param riskMeasureTimeIntervalInYears:
+    :param alpha:
+    :param NumberOfDaysPerYears:
+    :return:
+    """
+
+    # historical log returns in the past over the 10 days time lag
+    logReturns = logReturns.iloc[:, 1].to_numpy()
+    # num observations
+    n_observations = len(logReturns)
+
+    # Parameters of weighted historical simulation
+    C = (1 - lambdaWHS)/(1 - lambdaWHS**n_observations)
+    # compute simulation weights
+    lambdaExponent = np.arange(n_observations-1, -1, -1)
+    weights_sim = C * np.power(lambdaWHS, lambdaExponent)
+    # Evaluate vector of new prices in t+delta
+    vectorStockt1 = stockPrice * np.exp(10*logReturns)
+
+
+    timeToMaturityInYears -= riskMeasureTimeIntervalInYears * NumberOfDaysPerYears / 365
+    d1 = (np.log(vectorStockt1 / strike) + (rate - dividend + 0.5 * volatility ** 2) * timeToMaturityInYears) / (
+            volatility * np.sqrt(timeToMaturityInYears))
+    # Delta for Call with given params
+    deltaCallt1 = np.exp(-dividend * timeToMaturityInYears) * norm.cdf(d1)
+
+    # Loss total portfolio
+    lossTotal = -(-numberOfCalls * deltaCallt1 + numberOfShares)*stockPrice*logReturns*10
+
+    # Now I have vector of total losses, and I also have the corresponding weights of each
+    # observation stored in the weights_sim vector
+
+    # Sorting the losses in decreasing order, using zip sorted (keeping relation with weights)
+    lossTotal, weights_sim = zip(*sorted(zip(lossTotal, weights_sim), reverse=True))
+
+    # find the index that satisfy the constraints
+    # initialize index counter
+    i_temp = 0
+    # initialize sum simulation weights
+    sum_weights_sim = 0
+
+    # while loop to find the index of the weights sum corresponding to 1-alpha
+    while sum_weights_sim <= (1 - alpha):
+        sum_weights_sim += weights_sim[i_temp]
+        i_temp += 1
+    i_star = i_temp - 1
+
+    # compute VaR with WHS
+    VaR = lossTotal[i_star]
+    print('VaR:', VaR)
+
+    return VaR

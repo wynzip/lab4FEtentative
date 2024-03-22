@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from assignment4functions import price_to_return
 from assignment4functions import FullMonteCarloVaR
+from assignment4functions import DeltaNormalVaR
 from assignment4functions import SliceDataFromStartDate
 from scipy.stats import norm
 from FE_Library import yearfrac
@@ -38,7 +39,7 @@ Dataset_2 = SliceDataFromStartDate(Dataset_2, valueDate, time_frame)
 logReturns = price_to_return(Dataset_2.copy())
 
 # Portfolio Value
-portfolioValue = 11860680
+portfolioValue = 1186680
 
 # number of BMW stocks of the Portfolio 2
 stockPrice = Dataset_2.iloc[-1, 1]
@@ -63,3 +64,8 @@ lambdaWHS = 0.95
 print('VaR with Full MC:')
 FullMCVaR = FullMonteCarloVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike, rate, dividend,
 volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, NumberOfDaysPerYears, lambdaWHS)
+
+print('VaR with Delta-normal method:')
+DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike, rate, dividend,
+                   volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, NumberOfDaysPerYears,
+                    lambdaWHS)
