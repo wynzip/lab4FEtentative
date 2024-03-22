@@ -371,7 +371,28 @@ volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, Number
     # Loss total portfolio
     lossTotal = lossDer + lossStock
 
+    # Now I have vector of total losses for each simulation, and I also have the corresponding weights of each
+    # simulation stored in the weightsSims vector
 
-    VaR = 0
+    # Sorting the losses in decreasing order, using zip sorted (keeping relation with weights)
+    lossTotal, weightsSims = zip(*sorted(zip(lossTotal, weightsSims), reverse=True))
+
+    # find the index that satisfy the constraints
+    # initialize index counter
+    i_temp = 0
+    # initialize sum simulation weights
+    sum_weights_sim = 0
+
+    # while loop to find the index of the weights sum corresponding to 1-alpha
+    while sum_weights_sim <= (1 - alpha):
+        sum_weights_sim += weightsSims[i_temp]
+        i_temp += 1
+    i_star = i_temp - 1
+
+    # compute VaR with WHS
+    VaR = lossTotal[i_star]
+    # VEDIAMO SE METTERE QUESTA SQRT
+    print('VaR:', VaR)
+
     return VaR
 

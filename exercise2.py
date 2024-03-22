@@ -60,5 +60,6 @@ riskMeasureTimeIntervalInYears = 10/NumberOfDaysPerYears
 alpha = 0.95
 lambdaWHS = 0.95
 
+print('VaR with Full MC:')
 FullMCVaR = FullMonteCarloVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike, rate, dividend,
 volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, NumberOfDaysPerYears, lambdaWHS)

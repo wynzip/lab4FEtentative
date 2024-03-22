@@ -8,7 +8,6 @@ from assignment4functions import plausibilityCheck
 from assignment4functions import SliceDataFromStartDate
 from assignment4functions import PrincCompAnalysis
 
-np.random.seed(42)
 # load EUROSTOXX_Dataset
 file_csv = "EUROSTOXX50_Dataset.csv"
 Dataset = pd.read_csv(file_csv)
