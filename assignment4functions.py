@@ -319,14 +319,8 @@ volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, Number
     :return:
     """
 
-    # Black params d1 and d2
-    d1 = (np.log(stockPrice / strike) + (rate - dividend + 0.5 * volatility ** 2) * timeToMaturityInYears) / (
-                volatility * np.sqrt(timeToMaturityInYears))
-    d2 = d1 - volatility * np.sqrt(timeToMaturityInYears)
-
-    # Black formula for Call: price
-    callPrice = stockPrice * np.exp(-dividend * timeToMaturityInYears) * norm.cdf(d1) - strike * np.exp(
-        -rate * timeToMaturityInYears) * norm.cdf(d2)
+    # Black-Scholes formula for Call price
+    callPrice = blsCall(stockPrice, strike, rate, dividend, volatility, timeToMaturityInYears)
 
     # historical log returns in the past over the 10 days time lag
     logReturns = logReturns.iloc[:, 1].to_numpy()
@@ -350,17 +344,11 @@ volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, Number
     weightsSims = weightsSims/np.sum(weightsSims)
 
     # Evaluate vector of new prices in t+delta: one for each simulation
-    vectorStockt1 = stockPrice * np.exp(10*logRetMC)
-
-    # Black params d1 and d2
-    timeToMaturityInYears -= riskMeasureTimeIntervalInYears * NumberOfDaysPerYears / 365
-    d1 = (np.log(vectorStockt1 / strike) + (rate - dividend + 0.5 * volatility ** 2) * timeToMaturityInYears) / (
-            volatility * np.sqrt(timeToMaturityInYears))
-    d2 = d1 - volatility * np.sqrt(timeToMaturityInYears)
+    vectorStockt1 = stockPrice * np.exp(riskMeasureTimeIntervalInYears*NumberOfDaysPerYears*logRetMC)
 
     # Evaluate call prices considering the simulated vector of prices in t+delta
-    vectorCallt1 = vectorStockt1 * np.exp(-dividend * timeToMaturityInYears) * norm.cdf(d1) - strike * np.exp(
-        -rate * timeToMaturityInYears) * norm.cdf(d2)
+    timeToMaturityInYears -= riskMeasureTimeIntervalInYears * NumberOfDaysPerYears / 365
+    vectorCallt1 = blsCall(vectorStockt1, strike, rate, dividend, volatility, timeToMaturityInYears)
 
     # Evaluate derivative losses (Remark: we're shorting the derivative, so we remove the minus)
     lossDer = numberOfCalls * (vectorCallt1 - callPrice)
@@ -426,7 +414,7 @@ def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike
     lambdaExponent = np.arange(n_observations-1, -1, -1)
     weights_sim = C * np.power(lambdaWHS, lambdaExponent)
     # Evaluate vector of new prices in t+delta
-    vectorStockt1 = stockPrice * np.exp(10*logReturns)
+    vectorStockt1 = stockPrice * np.exp(riskMeasureTimeIntervalInYears*NumberOfDaysPerYears*logReturns)
 
 
     timeToMaturityInYears -= riskMeasureTimeIntervalInYears * NumberOfDaysPerYears / 365
@@ -461,3 +449,27 @@ def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike
     print('VaR:', VaR)
 
     return VaR
+
+
+def blsCall(stockPrice, strike, rate, dividend, volatility, timeToMaturityInYears):
+    """
+    Calculates the Call option price according to Black and Scholes formula
+    :param stockPrice:
+    :param strike:
+    :param rate:
+    :param dividend:
+    :param volatility:
+    :param timeToMaturityInYears:
+    :return:
+    """
+
+    # Black-Scholes params d1 and d2
+    d1 = (np.log(stockPrice / strike) + (rate - dividend + 0.5 * volatility ** 2) * timeToMaturityInYears) / (
+            volatility * np.sqrt(timeToMaturityInYears))
+    d2 = d1 - volatility * np.sqrt(timeToMaturityInYears)
+
+    # Evaluate call prices
+    callPrice = stockPrice * np.exp(-dividend * timeToMaturityInYears) * norm.cdf(d1) - strike * np.exp(
+        -rate * timeToMaturityInYears) * norm.cdf(d2)
+
+    return callPrice
