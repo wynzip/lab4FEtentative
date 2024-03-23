@@ -215,7 +215,6 @@ def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasu
 
     # compute VaR with WHS
     VaR_WHS = math.sqrt(riskMeasureTimeIntervalInDay) * L[i_star]
-    # VEDIAMO SE METTERE QUESTA SQRT
     print('VaR:', VaR_WHS)
 
     # compute ES with WHS
