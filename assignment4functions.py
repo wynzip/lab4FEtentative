@@ -132,7 +132,7 @@ def HSMeasurements(returns, alpha, weights, portfolioValue, riskMeasureTimeInter
 
     VaR = math.sqrt(riskMeasureTimeIntervalInDay) * loss[index]
     print('VaR:', VaR)
-    ES = math.sqrt(riskMeasureTimeIntervalInDay)*loss[0:index].mean()
+    ES = math.sqrt(riskMeasureTimeIntervalInDay)*loss[0:index+1].mean()
     # mean value of the worst losses up to the VaR one
     print('ES:', ES)
 
@@ -195,6 +195,11 @@ def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasu
 
     # order losses in decreasing way and the respective simulation weights
     L, weights_sim = zip(*sorted(zip(L, weights_sim), reverse=True))
+    # EXPLANATION OF ZIP(*SORTED(ZIP...)): the first zip binds together L and weights_sim as sort of pairs of
+    # coordinates (x,y); then *sorted orders these pairs based on the ordering of the x value (so the losses L), and we
+    # specified reverse=True to have the losses ordered from biggest to smallest; finally, the second zip "unzips" the
+    # pairs and returns them as two separate vectors, but now they're ordered how we wanted and the relationship
+    # between losses and historical weights are mantained
 
     # find the index that satisfy the constraints
     # initialize index counter
@@ -214,8 +219,8 @@ def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasu
     print('VaR:', VaR_WHS)
 
     # compute ES with WHS
-    ES_WHS = (math.sqrt(riskMeasureTimeIntervalInDay) * (np.dot(weights_sim[:i_star], L[:i_star])) /
-              (np.sum(weights_sim[:i_star])))
+    ES_WHS = (math.sqrt(riskMeasureTimeIntervalInDay) * (np.dot(weights_sim[:i_star+1], L[:i_star+1])) /
+              (np.sum(weights_sim[:i_star+1])))
     print('ES:', ES_WHS)
 
     return ES_WHS, VaR_WHS
@@ -280,6 +285,7 @@ def PrincCompAnalysis(yearlyCovariance, yearlyMeanReturns, weights, H, alpha, nu
     eigenvalues, eigenvectors = np.linalg.eig(yearlyCovariance)
     # order for decrescent eigenvalues
     eigenvalues, eigenvectors = zip(*sorted(zip(eigenvalues, eigenvectors.T), reverse=True))
+    # zip functioning explained in WHS method
     eigenvalues = np.diag(eigenvalues)  # make eig into a diag matrix
     eigenvectors = np.array(eigenvectors).T  # make eigenvectors be  matrix again, it was messed up cause of zip
 
@@ -364,6 +370,7 @@ volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, Number
 
     # Sorting the losses in decreasing order, using zip sorted (keeping relation with weights)
     lossTotal, weightsSims = zip(*sorted(zip(lossTotal, weightsSims), reverse=True))
+    # zip functioning explained in WHS method
 
     # find the index that satisfy the constraints
     # initialize index counter
@@ -431,6 +438,7 @@ def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike
 
     # Sorting the losses in decreasing order, using zip sorted (keeping relation with weights)
     lossTotal, weights_sim = zip(*sorted(zip(lossTotal, weights_sim), reverse=True))
+    # zip functioning explained in WHS method
 
     # find the index that satisfy the constraints
     # initialize index counter

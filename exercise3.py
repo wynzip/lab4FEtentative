@@ -66,6 +66,7 @@ zeroRatesPayment = np.interp(yearFracPayment, yearFracBoot, zeroRates)
 # Find the discount factors for payment dates
 discFactorsPayment = np.exp(-zeroRatesPayment*yearFracPayment)
 
+# we checked the results with the previous lab on matlab
 ##########################################################
 
 # Monte Carlo simulation to price the Cliquet option
