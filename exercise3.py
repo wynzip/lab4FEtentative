@@ -92,7 +92,7 @@ underlyingDynamics[:, 0] = S0 * underlyingDynamics[:, 0]
 
 # Evaluating the underlying simulated dynamics: Geometric Brownian Motion
 for i in range(numPayments):
-    underlyingDynamics[:, i+1] = (underlyingDynamics[:, i] * np.exp((forwardDiscRates[i] - sigma**2/2)*deltaPayments[i])
+    underlyingDynamics[:, i+1] = underlyingDynamics[:, i] * np.exp((forwardDiscRates[i] - sigma**2/2)*deltaPayments[i]
                                   + sigma * np.sqrt(deltaPayments[i]) * gaussRV[:, i])
 
 # Now that we have the stock dynamics in time, let's evaluate the option's payoff, year by year, one payoff for each sim
@@ -110,7 +110,7 @@ print('MC price NON-defaultable: ', priceNoDefaultMC)
 survProbs = survProbsData.iloc[:, 1].to_numpy()
 defaultProbs = np.add(np.array([1] + survProbs[:-1].tolist()), - survProbs)
 
-# Now we can evaluate the price of the option in case of possible defaults
+# Now we can evaluate the price of the option in case of possible defaults #MISSIGN RECOVERY PART
 priceDefaultMC = np.dot(survProbs, payoffDiscMC)
 # NB: for now we're considering recovery 0
 print('MC price defaultable: ', priceDefaultMC)
@@ -118,24 +118,18 @@ print('MC price defaultable: ', priceDefaultMC)
 ################################################
 
 # Analytical price for the Cliquet option
-# We consider the Cliquet option as a sum of individual Call options, each one lasting one year and starting when the
-# previous one expires
+# We consider the Cliquet option as a sum of individual Forward Start Call options, each one lasting one year
+# and starting when the previous one expires
 
-# Let's price each individual call
-callPricesVec = np.zeros(numPayments)
-discFactorsPayment = np.insert(discFactorsPayment, 0, 1)
-for i in range(numPayments):
-    callPricesVec[i] = blsCall(S0/discFactorsPayment[i], S0/(partCoeff*discFactorsPayment[i]), forwardDiscRates[i], 0, sigma, deltaPayments[i])
+# Let's price each individual Forward Start Call: for derivation and explanation of formula please consult our report
+callPricesVec = blsCall(S0, S0/partCoeff, forwardDiscRates, 0, sigma, deltaPayments)
 
-for i in range(numPayments):
-    callPricesVec[i] = blsCall(S0, S0/partCoeff, forwardDiscRates[i], 0, sigma, deltaPayments[i])
-
-# Now let's discount the back to today's date, sum the values, multiply by the notional, and we obtain the analytical price with NO default
-priceNoDefaultAN = np.sum(discFactorsPayment[1:] * callPricesVec) * notional * partCoeff
+# Sum the single option prices, multiply by the notional, and we obtain the analytical price with NO default
+priceNoDefaultAN = np.sum(callPricesVec) * notional * partCoeff
 print('Analytical price NON-defaultable: ', priceNoDefaultAN)
 
-# Now, price in defaultable case
-priceDefaultAN = np.sum(discFactorsPayment[1:] * callPricesVec * survProbs) * notional * partCoeff
+# Price in defaultable case #MISSIGN RECOVERY PART
+priceDefaultAN = np.sum(callPricesVec * survProbs) * notional * partCoeff
 print('Analytical price defaultable: ', priceDefaultAN)
 
 
