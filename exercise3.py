@@ -8,6 +8,8 @@ import numpy as np
 from FE_Library import yearfrac
 from assignment4functions import blsCall
 import random
+import scipy.stats as stats
+import math
 
 # load EUROSTOXX_Dataset
 file_csv = "EUROSTOXX50_Dataset.csv"
@@ -102,13 +104,28 @@ for i in range(numPayments):
 # Now that we have the stock dynamics in time, let's evaluate the option's payoff, year by year, one payoff for each sim
 payoffMC = np.maximum(0, np.add(partCoeff * underlyingDynamics[:, 1:], - underlyingDynamics[:, :-1]))
 
-# Compute discounted payoff, one for each year (one for each "call" constituting our Cliquet option), including notional
+# Compute discounted payoff, one for each year (one for each fwd startcall constituting our Cliquet), including notional
 payoffDiscMC = np.mean(payoffMC, axis=0) * discFactorsPayment * notional
 # compute the mean payoff of each column (so one for each year) and then discount them by the corresponding DF
+
+# Compute sample standard deviation
+stdVec = np.zeros(len(payoffDiscMC))
+for i in range(len(payoffDiscMC)):
+    stdVec[i] = np.sum((np.add(payoffMC[:, i], - np.mean(payoffMC, axis=0)[i]))**2)
+sampleStdMC = np.sqrt(stdVec/(nSim - 1)) * discFactorsPayment * notional
+# sample standard deviation computed as array that will then be summed (one std for each call price)
+# we have to multiply by the discount factors and the notional to be "financially" coherent with the payoff value
 
 # Evaluate final MC price of Cliquet option in case of no counterparty risk
 priceNoDefaultMC = np.sum(payoffDiscMC)
 print('MC price NON-defaultable: ', priceNoDefaultMC)
+
+# Evaluate MC confidence interval for the Cliquet option price in case of no counterparty risk
+normQuantile = stats.norm.ppf(q=0.975, loc=0, scale=1)  # quantile z(alpha/2) of standard normal
+lowBoundNoDefMC = np.sum(np.add(payoffDiscMC, - normQuantile*sampleStdMC/math.sqrt(nSim)))
+upBoundNoDefMC = np.sum(np.add(payoffDiscMC, + normQuantile*sampleStdMC/math.sqrt(nSim)))
+confIntNoDefMC = [lowBoundNoDefMC, upBoundNoDefMC]
+print('MC price NON-defaultable confidence interval: ', confIntNoDefMC)
 
 # Compute default probabilites (year by year)
 survProbs = survProbsData.iloc[:, 1].to_numpy()  # we will need it as numpy array afterward
@@ -126,6 +143,20 @@ futureCashFlowsMC = np.flip(np.cumsum(payoffDiscMC))  # future CF for year 0 to 
 # Evaluate MC price of Cliquet option in presence of counterparty risk
 priceDefaultMC = np.dot(survProbs, payoffDiscMC) + recovery * np.dot(defaultProbs, futureCashFlowsMC)
 print('MC price defaultable: ', priceDefaultMC)
+
+# Evaluate MC confidence interval of Cliquet option in presence of counterparty risk
+lowStdPayoffDiscMC = np.add(payoffDiscMC, - normQuantile*sampleStdMC/math.sqrt(nSim))
+upStdPayoffDiscMC = np.add(payoffDiscMC, + normQuantile*sampleStdMC/math.sqrt(nSim))
+
+lowStdFutureCF = np.flip(np.cumsum(lowStdPayoffDiscMC))
+upStdFutureCF = np.flip(np.cumsum(upStdPayoffDiscMC))
+
+lowBoundDefMC = np.dot(survProbs, lowStdPayoffDiscMC) + recovery * np.dot(defaultProbs, lowStdFutureCF)
+upBoundDefMC = np.dot(survProbs, upStdPayoffDiscMC) + recovery * np.dot(defaultProbs, upStdFutureCF)
+
+confIntDefMC = [lowBoundDefMC, upBoundDefMC]
+print('MC price defaultable confidence interval: ', confIntDefMC)
+
 
 ################################################
 
