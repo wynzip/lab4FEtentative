@@ -27,7 +27,7 @@ def SliceDataFromStartDate(data, endDate, duration):
     data = data[(data['Date'] >= startDate)]
 
     # Remove the date from the returns dataFrame and transform it to a numpy array
-    #data = data.iloc[:, 1:].apply(pd.to_numeric, errors='coerce')
+    # data = data.iloc[:, 1:].apply(pd.to_numeric, errors='coerce')
     data = data.reset_index(drop=True)
 
     return data
@@ -69,7 +69,8 @@ def AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeInte
     VaR_std = t.ppf(alpha, df=nu)
 
     # VaR with variance/covariance method
-    VaR = riskMeasureTimeIntervalInDay*mean_loss + math.sqrt(riskMeasureTimeIntervalInDay)*math.sqrt(cov_loss) * VaR_std
+    VaR = riskMeasureTimeIntervalInDay * mean_loss + math.sqrt(riskMeasureTimeIntervalInDay) * math.sqrt(
+        cov_loss) * VaR_std
 
     # portfolio VaR
     var_value = portfolioValue * VaR
@@ -82,7 +83,8 @@ def AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeInte
     ES_std = ((nu + VaR_std ** 2) / (nu - 1)) * (phi_t / (1 - alpha))
 
     # ES with variance/covariance method
-    ES = riskMeasureTimeIntervalInDay*mean_loss + math.sqrt(riskMeasureTimeIntervalInDay)*math.sqrt(cov_loss) * ES_std
+    ES = riskMeasureTimeIntervalInDay * mean_loss + math.sqrt(riskMeasureTimeIntervalInDay) * math.sqrt(
+        cov_loss) * ES_std
 
     # portfolio ES
     es_value = portfolioValue * ES
@@ -128,11 +130,11 @@ def HSMeasurements(returns, alpha, weights, portfolioValue, riskMeasureTimeInter
     loss = loss[::-1]  # loss distribution changed to decreasing order (worst loss first value)
 
     n = len(loss)  # number of historical returns used --> "size" of loss distribution
-    index = math.floor(n*(1 - alpha))  # index of the loss corresponding to VaR
+    index = math.floor(n * (1 - alpha))  # index of the loss corresponding to VaR
 
     VaR = math.sqrt(riskMeasureTimeIntervalInDay) * loss[index]
     print('VaR:', VaR)
-    ES = math.sqrt(riskMeasureTimeIntervalInDay)*loss[0:index+1].mean()
+    ES = math.sqrt(riskMeasureTimeIntervalInDay) * loss[0:index + 1].mean()
     # mean value of the worst losses up to the VaR one
     print('ES:', ES)
 
@@ -149,7 +151,7 @@ def bootstrapStatistical(numberOfSamplesToBootstrap, returns):
     :return: samples:                       indexes of returns that were sampled
     """
     n = len(returns)
-    samples = np.array([np.random.randint(0, n-1) for _ in range(numberOfSamplesToBootstrap)])
+    samples = np.array([np.random.randint(0, n - 1) for _ in range(numberOfSamplesToBootstrap)])
     return samples
 
 
@@ -159,7 +161,7 @@ def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasu
 
     :param returns:                         returns' matrix
     :param alpha:                           significance value
-    :param lambda_P:                           historical index
+    :param lambda_P:                        historical index
     :param weights:                         portfolio weights
     :param portfolioValue:                  notional
     :param riskMeasureTimeIntervalInDay:    estimation interval in day
@@ -188,7 +190,7 @@ def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasu
     # yearfrac_vector = [yearfrac(data, last_date, 3) for data in date]
 
     # Compute the exponents for the lambda coefficients: decreasing in time
-    lambdaExponent = np.arange(n-1, -1, -1)
+    lambdaExponent = np.arange(n - 1, -1, -1)
 
     # compute simulation weights
     weights_sim = C * np.power(lambda_P, lambdaExponent)
@@ -218,8 +220,8 @@ def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasu
     print('VaR:', VaR_WHS)
 
     # compute ES with WHS
-    ES_WHS = (math.sqrt(riskMeasureTimeIntervalInDay) * (np.dot(weights_sim[:i_star+1], L[:i_star+1])) /
-              (np.sum(weights_sim[:i_star+1])))
+    ES_WHS = (math.sqrt(riskMeasureTimeIntervalInDay) * (np.dot(weights_sim[:i_star + 1], L[:i_star + 1])) /
+              (np.sum(weights_sim[:i_star + 1])))
     print('ES:', ES_WHS)
 
     return ES_WHS, VaR_WHS
@@ -245,7 +247,7 @@ def plausibilityCheck(returns, portfolioWeights, alpha, portfolioValue, riskMeas
     lowerQuantiles = np.quantile(returns, 1 - alpha, axis=0)
 
     # Compute signedVaR for each risk factor
-    signedVaR = portfolioWeights*(abs(upperQuantiles) + abs(lowerQuantiles))/2
+    signedVaR = portfolioWeights * (abs(upperQuantiles) + abs(lowerQuantiles)) / 2
 
     # Compute Correlation Matrix with command corrcoef
     CorrelationMatrix = np.corrcoef(returns, rowvar=False)  # rowvar = False means that each column is a variable
@@ -253,7 +255,7 @@ def plausibilityCheck(returns, portfolioWeights, alpha, portfolioValue, riskMeas
     # Compute VaR according to plausibility check rule of thumb
     VaR = (math.sqrt(signedVaR.transpose().dot(CorrelationMatrix).dot(signedVaR)) *
            math.sqrt(riskMeasureTimeIntervalInDay))
-    VaR_value = VaR*portfolioValue  # multiply for the portfolio value in time t to get reasonable measure
+    VaR_value = VaR * portfolioValue  # multiply for the portfolio value in time t to get reasonable measure
     print('Plausibility check on VaR:', VaR_value)
 
     return VaR_value
@@ -278,7 +280,7 @@ def PrincCompAnalysis(yearlyCovariance, yearlyMeanReturns, weights, H, alpha, nu
     mean_loss = - weights.dot(yearlyMeanReturns)
     cov_loss = (weights.dot(yearlyCovariance)).dot(weights)
     VaR_std = norm.ppf(alpha, loc=mean_loss, scale=math.sqrt(cov_loss))
-    ES_std = norm.ppf(alpha, loc=mean_loss, scale=math.sqrt(cov_loss))/(1-alpha)
+    ES_std = norm.ppf(alpha, loc=mean_loss, scale=math.sqrt(cov_loss)) / (1 - alpha)
 
     # compute eigenvalues
     eigenvalues, eigenvectors = np.linalg.eig(yearlyCovariance)
@@ -293,22 +295,24 @@ def PrincCompAnalysis(yearlyCovariance, yearlyMeanReturns, weights, H, alpha, nu
     weights_hat = np.dot(eigenvectors.T, weights)
 
     # mean and covariance for reduced form portfolio
-    mu_rfp = sum((weights_hat*mu_hat)[:numberOfPrincipalComponents])
+    mu_rfp = sum((weights_hat * mu_hat)[:numberOfPrincipalComponents])
     sigma_rfp = sum(((weights_hat ** 2).dot(eigenvalues))[:numberOfPrincipalComponents])
-    VaR = H*mu_rfp + math.sqrt(H)*math.sqrt(sigma_rfp) * VaR_std
+    VaR = H * mu_rfp + math.sqrt(H) * math.sqrt(sigma_rfp) * VaR_std
     VaR_value = portfolioValue * VaR
-    print('VaR with PCA:', VaR_value)
+    print('VaR:', VaR_value)
 
-    ES = H*mu_rfp + math.sqrt(H)*math.sqrt(sigma_rfp) * ES_std
+    ES = H * mu_rfp + math.sqrt(H) * math.sqrt(sigma_rfp) * ES_std
     ES_value = ES * portfolioValue
-    print('ES with PCA:', ES_value)
+    print('ES:', ES_value)
 
     return ES_value, VaR_value
 
-def FullMonteCarloVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike, rate, dividend,
-volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, NumberOfDaysPerYears, lambdaWHS):
+
+def FullMonteCarloVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike, rate, dividend, volatility,
+                      timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, NumberOfDaysPerYears, lambdaWHS):
     """
     Function to compute full Monte Carlo VaR of portfolio
+
     :param logReturns:
     :param numberOfShares:
     :param numberOfCalls:
@@ -321,6 +325,7 @@ volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, Number
     :param riskMeasureTimeIntervalInYears:
     :param alpha:
     :param NumberOfDaysPerYears:
+    :param lambdaWHS:
     :return:
     """
 
@@ -329,27 +334,27 @@ volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, Number
 
     # historical log returns in the past over the 10 days time lag
     logReturns = logReturns.iloc[:, 1].to_numpy()
-    delta = int(riskMeasureTimeIntervalInYears*NumberOfDaysPerYears)
+    delta = int(riskMeasureTimeIntervalInYears * NumberOfDaysPerYears)
 
     # Randomly extract indices from the vector of logReturns to use as sampled log returns
     nSim = int(1e4)
     indexes = np.random.randint(0, int(len(logReturns)), (nSim, 1))
     logRetMC = logReturns[indexes]
 
-    #tenDaysReturns = np.array([np.sum(logReturns[i:i + delta]) for i in range(0, len(logReturns) - delta)])  # X(t+delta)
-    #nSims = len(tenDaysReturns)
+    # tenDaysReturns = np.array([np.sum(logReturns[i:i + delta]) for i in range(0, len(logReturns) - delta)])  # X(t+delta)
+    # nSims = len(tenDaysReturns)
 
     # Create the vector of initial Call prices
     # Create the vector of initial Stock values
 
     # Parameters of weighted historical simulation
-    C = (1 - lambdaWHS)/(1 - lambdaWHS**nSim)
+    C = (1 - lambdaWHS) / (1 - lambdaWHS ** nSim)
     lambdaExponent = len(logReturns) - 1 - indexes
     weightsSims = C * np.power(lambdaWHS, lambdaExponent)  # for now they're in the same order as the simulated prices
-    weightsSims = weightsSims/np.sum(weightsSims)
+    weightsSims = weightsSims / np.sum(weightsSims)
 
     # Evaluate vector of new prices in t+delta: one for each simulation
-    vectorStockt1 = stockPrice * np.exp(riskMeasureTimeIntervalInYears*NumberOfDaysPerYears*logRetMC)
+    vectorStockt1 = stockPrice * np.exp(riskMeasureTimeIntervalInYears * NumberOfDaysPerYears * logRetMC)
 
     # Evaluate call prices considering the simulated vector of prices in t+delta
     timeToMaturityInYears -= riskMeasureTimeIntervalInYears * NumberOfDaysPerYears / 365
@@ -389,9 +394,10 @@ volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, Number
 
     return VaR
 
+
 def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike, rate, dividend,
                    volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, NumberOfDaysPerYears,
-                    lambdaWHS):
+                   lambdaWHS):
     """
     Function to compute full VaR of portfolio with Delta Normal method
     :param logReturns:
@@ -415,13 +421,12 @@ def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike
     n_observations = len(logReturns)
 
     # Parameters of weighted historical simulation
-    C = (1 - lambdaWHS)/(1 - lambdaWHS**n_observations)
+    C = (1 - lambdaWHS) / (1 - lambdaWHS ** n_observations)
     # compute simulation weights
-    lambdaExponent = np.arange(n_observations-1, -1, -1)
+    lambdaExponent = np.arange(n_observations - 1, -1, -1)
     weights_sim = C * np.power(lambdaWHS, lambdaExponent)
     # Evaluate vector of new prices in t+delta
-    vectorStockt1 = stockPrice * np.exp(riskMeasureTimeIntervalInYears*NumberOfDaysPerYears*logReturns)
-
+    vectorStockt1 = stockPrice * np.exp(riskMeasureTimeIntervalInYears * NumberOfDaysPerYears * logReturns)
 
     timeToMaturityInYears -= riskMeasureTimeIntervalInYears * NumberOfDaysPerYears / 365
     d1 = (np.log(vectorStockt1 / strike) + (rate - dividend + 0.5 * volatility ** 2) * timeToMaturityInYears) / (
@@ -430,7 +435,8 @@ def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike
     deltaCallt1 = np.exp(-dividend * timeToMaturityInYears) * norm.cdf(d1)
 
     # Loss total portfolio
-    lossTotal = -(-numberOfCalls * deltaCallt1 + numberOfShares)*stockPrice*logReturns*riskMeasureTimeIntervalInYears*NumberOfDaysPerYears
+    lossTotal = -(
+                -numberOfCalls * deltaCallt1 + numberOfShares) * stockPrice * logReturns * riskMeasureTimeIntervalInYears * NumberOfDaysPerYears
 
     # Now I have vector of total losses, and I also have the corresponding weights of each
     # observation stored in the weights_sim vector
