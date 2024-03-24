@@ -430,7 +430,7 @@ def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike
     deltaCallt1 = np.exp(-dividend * timeToMaturityInYears) * norm.cdf(d1)
 
     # Loss total portfolio
-    lossTotal = -(-numberOfCalls * deltaCallt1 + numberOfShares)*stockPrice*logReturns*10
+    lossTotal = -(-numberOfCalls * deltaCallt1 + numberOfShares)*stockPrice*logReturns*riskMeasureTimeIntervalInYears*NumberOfDaysPerYears
 
     # Now I have vector of total losses, and I also have the corresponding weights of each
     # observation stored in the weights_sim vector
