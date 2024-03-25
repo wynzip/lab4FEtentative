@@ -50,10 +50,6 @@ def AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeInte
     :return: ES:                            Expected Shortfall
     :return: VaR:                           Value at Risk
     """
-    # Remove the date from the returns dataFrame and transform it to a numpy array
-    # returns = returns.iloc[:, 1:].apply(pd.to_numeric, errors='coerce')
-    # returns = returns.reset_index(drop=True)
-
 
     # log returns' mean for each analyzed company
     mu_vector = returns.iloc[:, 1:].mean()
