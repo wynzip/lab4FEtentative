@@ -25,9 +25,6 @@ date1 = pd.to_datetime(valueDate)
 maturityDate = '2017-04-18'
 date2 = pd.to_datetime(maturityDate)
 
-# substitute NaN with previous day data
-Dataset_2 = Dataset_2.ffill()
-
 # Slice the dataset from value date going backwards 2 years (for the WHS after)
 years = 2
 days_for_year = 365

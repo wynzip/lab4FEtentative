@@ -3,7 +3,7 @@ import numpy as np
 from scipy.stats import t
 from scipy.stats import norm
 import math
-
+import random
 
 def SliceDataFromStartDate(data, endDate, duration):
     """
@@ -25,6 +25,9 @@ def SliceDataFromStartDate(data, endDate, duration):
 
     # reduced dataset at the estimation interval
     data = data[(data['Date'] >= startDate)]
+
+    # fill the NaN values with previous values
+    data = data.ffill()
 
     # Remove the date from the returns dataFrame and transform it to a numpy array
     # data = data.iloc[:, 1:].apply(pd.to_numeric, errors='coerce')
@@ -51,8 +54,6 @@ def AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeInte
     # returns = returns.iloc[:, 1:].apply(pd.to_numeric, errors='coerce')
     # returns = returns.reset_index(drop=True)
 
-    # substitute NaN with previous data (NaN = missing share price)
-    returns = returns.ffill()
 
     # log returns' mean for each analyzed company
     mu_vector = returns.iloc[:, 1:].mean()
@@ -276,13 +277,11 @@ def PrincCompAnalysis(yearlyCovariance, yearlyMeanReturns, weights, H, alpha, nu
     :return: ES:
     :return: VaR:
     """
-    # assume loss distribution is gaussian
-    mean_loss = - weights.dot(yearlyMeanReturns)
-    cov_loss = (weights.dot(yearlyCovariance)).dot(weights)
-    VaR_std = norm.ppf(alpha, loc=mean_loss, scale=math.sqrt(cov_loss))
-    ES_std = norm.ppf(alpha, loc=mean_loss, scale=math.sqrt(cov_loss)) / (1 - alpha)
+    # Compute VaR std and ES std for Gaussian distributed losses (as by assumption of PCA method)
+    VaR_std = norm.ppf(alpha, loc=0, scale=1)
+    ES_std = norm.cdf(norm.ppf(alpha, loc=0, scale=1)) / (1 - alpha)
 
-    # compute eigenvalues
+    # compute eigenvalues and eigenvectors
     eigenvalues, eigenvectors = np.linalg.eig(yearlyCovariance)
     # order for decrescent eigenvalues
     eigenvalues, eigenvectors = zip(*sorted(zip(eigenvalues, eigenvectors.T), reverse=True))
@@ -328,6 +327,7 @@ def FullMonteCarloVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, str
     :param lambdaWHS:
     :return:
     """
+    #random.seed(40)  # for reproducibility of results reasons
 
     # Black-Scholes formula for Call price
     callPrice = blsCall(stockPrice, strike, rate, dividend, volatility, timeToMaturityInYears)
@@ -335,29 +335,34 @@ def FullMonteCarloVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, str
     # historical log returns in the past over the 10 days time lag
     logReturns = logReturns.iloc[:, 1].to_numpy()
     delta = int(riskMeasureTimeIntervalInYears * NumberOfDaysPerYears)
+    nObs = int(len(logReturns))
 
-    # Randomly extract indices from the vector of logReturns to use as sampled log returns
+    # Randomly extract indexes from the vector of logReturns to use as sampled log returns
     nSim = int(1e4)
-    indexes = np.random.randint(0, int(len(logReturns)), (nSim, 1))
+    indexes = np.random.randint(0, nObs, (nSim, delta))
+    # we want 10-days VaR, so we need 10 days log-returns, so for each simulation I take 10 indexes, so I simulate
+    # 10-day returns summing 10 random daily returns
+
+    # Matrix of log returns as taken above
     logRetMC = logReturns[indexes]
+    logRetDeltaMC = np.sum(logRetMC, axis=1)
 
-    # tenDaysReturns = np.array([np.sum(logReturns[i:i + delta]) for i in range(0, len(logReturns) - delta)])  # X(t+delta)
-    # nSims = len(tenDaysReturns)
+    # Parameter C for the weights of weighted historical simulation
+    C = (1 - lambdaWHS) / (1 - lambdaWHS ** nObs)
 
-    # Create the vector of initial Call prices
-    # Create the vector of initial Stock values
+    # For each simulation, compute the weight for each index of the simulation
+    regularWeights = C * lambdaWHS ** np.arange(nObs - 1, -1, -1)
+    singleWeightsSims = regularWeights[indexes]
 
-    # Parameters of weighted historical simulation
-    C = (1 - lambdaWHS) / (1 - lambdaWHS ** nSim)
-    lambdaExponent = len(logReturns) - 1 - indexes
-    weightsSims = C * np.power(lambdaWHS, lambdaExponent)  # for now they're in the same order as the simulated prices
+    # Find the weights for each simulation computing the mean of its weights and then normalizing so they sum up to 1
+    weightsSims = np.mean(singleWeightsSims, axis=1)  # for now, they're in the same order as the simulated prices
     weightsSims = weightsSims / np.sum(weightsSims)
 
     # Evaluate vector of new prices in t+delta: one for each simulation
-    vectorStockt1 = stockPrice * np.exp(riskMeasureTimeIntervalInYears * NumberOfDaysPerYears * logRetMC)
+    vectorStockt1 = stockPrice * np.exp(logRetDeltaMC)
 
     # Evaluate call prices considering the simulated vector of prices in t+delta
-    timeToMaturityInYears -= riskMeasureTimeIntervalInYears * NumberOfDaysPerYears / 365
+    timeToMaturityInYears -= delta/365
     vectorCallt1 = blsCall(vectorStockt1, strike, rate, dividend, volatility, timeToMaturityInYears)
 
     # Evaluate derivative losses (Remark: we're shorting the derivative, so we remove the minus)
@@ -371,7 +376,6 @@ def FullMonteCarloVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, str
 
     # Now I have vector of total losses for each simulation, and I also have the corresponding weights of each
     # simulation stored in the weightsSims vector
-
     # Sorting the losses in decreasing order, using zip sorted (keeping relation with weights)
     lossTotal, weightsSims = zip(*sorted(zip(lossTotal, weightsSims), reverse=True))
     # zip functioning explained in WHS method
@@ -381,7 +385,6 @@ def FullMonteCarloVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, str
     i_temp = 0
     # initialize sum simulation weights
     sum_weights_sim = 0
-
     # while loop to find the index of the weights sum corresponding to 1-alpha
     while sum_weights_sim <= (1 - alpha):
         sum_weights_sim += weightsSims[i_temp]
@@ -418,31 +421,35 @@ def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike
     # historical log returns in the past over the 10 days time lag
     logReturns = logReturns.iloc[:, 1].to_numpy()
     # num observations
-    n_observations = len(logReturns)
+    nObs = len(logReturns)
+    delta = int(riskMeasureTimeIntervalInYears * NumberOfDaysPerYears)
+
+    # Randomly extract indexes from the vector of logReturns to use as sampled log returns
+    nSim = int(1e4)
+    indexes = np.random.randint(0, nObs, (nSim, 1))
+    logRetMC = logReturns[indexes]
 
     # Parameters of weighted historical simulation
-    C = (1 - lambdaWHS) / (1 - lambdaWHS ** n_observations)
-    # compute simulation weights
-    lambdaExponent = np.arange(n_observations - 1, -1, -1)
-    weights_sim = C * np.power(lambdaWHS, lambdaExponent)
-    # Evaluate vector of new prices in t+delta
-    vectorStockt1 = stockPrice * np.exp(riskMeasureTimeIntervalInYears * NumberOfDaysPerYears * logReturns)
+    C = (1 - lambdaWHS) / (1 - lambdaWHS ** nObs)
 
-    timeToMaturityInYears -= riskMeasureTimeIntervalInYears * NumberOfDaysPerYears / 365
-    d1 = (np.log(vectorStockt1 / strike) + (rate - dividend + 0.5 * volatility ** 2) * timeToMaturityInYears) / (
+    # Compute the weight for each simulation
+    regularWeights = C * lambdaWHS ** np.arange(nObs - 1, -1, -1)
+    weightsSims = regularWeights[indexes]  # select relative weights
+    weightsSims = weightsSims/np.sum(weightsSims)  # normalize so they sum up to 1
+
+    # Evaluate sensitivity of the Call
+    d1 = (np.log(stockPrice / strike) + (rate - dividend + 0.5 * volatility ** 2) * timeToMaturityInYears) / (
             volatility * np.sqrt(timeToMaturityInYears))
     # Delta for Call with given params
-    deltaCallt1 = np.exp(-dividend * timeToMaturityInYears) * norm.cdf(d1)
+    deltaCall = np.exp(-dividend * timeToMaturityInYears) * norm.cdf(d1)
 
     # Loss total portfolio
-    lossTotal = -(
-                -numberOfCalls * deltaCallt1 + numberOfShares) * stockPrice * logReturns * riskMeasureTimeIntervalInYears * NumberOfDaysPerYears
-
-    # Now I have vector of total losses, and I also have the corresponding weights of each
-    # observation stored in the weights_sim vector
+    lossTotal = -(-numberOfCalls * deltaCall + numberOfShares) * stockPrice * logRetMC
+    # Now I have avector of total losses, which simulates the loss distribution, and I also have
+    # the corresponding weights of each observation stored in the weightsSims vector
 
     # Sorting the losses in decreasing order, using zip sorted (keeping relation with weights)
-    lossTotal, weights_sim = zip(*sorted(zip(lossTotal, weights_sim), reverse=True))
+    lossTotal, weights_sim = zip(*sorted(zip(lossTotal, weightsSims), reverse=True))
     # zip functioning explained in WHS method
 
     # find the index that satisfy the constraints
@@ -457,9 +464,9 @@ def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike
         i_temp += 1
     i_star = i_temp - 1
 
-    # compute VaR with WHS
-    VaR = lossTotal[i_star]
-    print('VaR:', VaR)
+    # compute VaR with WHS, using scaling factor because we computed a daily VaR and we want to have a 10day VaR
+    VaR = lossTotal[i_star]*math.sqrt(delta)
+    print('VaR:', float(VaR))
 
     return VaR
 

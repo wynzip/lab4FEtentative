@@ -27,9 +27,6 @@ days_for_year = 365
 time_frame = years * days_for_year + 1
 Dataset_A = SliceDataFromStartDate(Dataset_A.copy(), end_date, time_frame)
 
-# substitute NaN with previous data
-Dataset_A = Dataset_A.ffill()
-
 # compute returns for Portfolio A
 returns_A = price_to_return(Dataset_A.copy())
 
@@ -78,9 +75,6 @@ days_for_year = 365
 time_frame = years * days_for_year + 1
 Dataset_B = SliceDataFromStartDate(Dataset_B.copy(), end_date, time_frame)
 
-# substitute NaN with previous data
-Dataset_B = Dataset_B.ffill()
-
 # compute returns for Portfolio B
 returns_B = price_to_return(Dataset_B.copy())
 
@@ -123,8 +117,6 @@ days_for_year = 365
 time_frame = years * days_for_year + 1
 Dataset_C = SliceDataFromStartDate(Dataset_C.copy(), end_date, time_frame)
 
-# substitute NaN with previous data
-Dataset_C = Dataset_C.ffill()
 
 # compute returns for Portfolio
 returns_C = price_to_return(Dataset_C.copy())
@@ -159,4 +151,4 @@ for number_pc in range(1, 6):
     ES_C_PCA[number_pc-1], VaR_C_PCA[number_pc-1] = PrincCompAnalysis(cov_matrix, mean_vector, weights_C, H, alpha_C, number_pc, portfolioValue_C)
 
 # check on the order of magnitude
-VaR_WHS_ptf2_check = plausibilityCheck(returns_C, weights_C, alpha_C, portfolioValue_C, H)
+VaR_WHS_ptf2_check = plausibilityCheck(returns_C, weights_C, alpha_C, portfolioValue_C, H*buss_days_year)

@@ -86,8 +86,26 @@ for i in range(numPayments):
 forwardDiscRates = -np.log(forwardDiscFact)/deltaPayments  # forward discount rates
 
 # MC parameters
-nSim = int(1e5)
+nSim = int(1e4)
 random.seed(40)
+
+# draw random probabilities
+randU = np.random.uniform(0, 1, (nSim, 1))
+
+# find the corresponding time to defaults
+tau = np.full((nSim, 1), 0)
+
+for i in range(nSim):
+    tau[i] = next((x for x in survProbsData.iloc[:, 1].tolist() if x <= randU[i]), 8)
+    #index_year = np.where(survProbsData.iloc[:, 1].values <= random_u[i])  # we find where the tau falls
+    # I'm finding the index which corresponds to the first prob. with value smaller than this
+    #if len(indexYear) == 0:  # when tau_ISP>maturity
+        # when tau_ISP > maturity
+        #tau[i] = 8
+    #if indexYear < 8:
+     #   tau[i] = yearfrac(bootStartDate, survProbsData.iloc[indexYear, 0], 3)
+
+print(tau)
 
 # Random realizations of std Gaussian r.v. to simulate underlying's GBM dynamics
 gaussRV = np.random.normal(loc=0, scale=1, size=((nSim, numPayments)))  # numPayments is 7
