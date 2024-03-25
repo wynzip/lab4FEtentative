@@ -1,15 +1,18 @@
 import pandas as pd
-import numpy as np
+# import numpy as np
 from assignment4functions import price_to_return
 from assignment4functions import FullMonteCarloVaR
 from assignment4functions import DeltaNormalVaR
 from assignment4functions import SliceDataFromStartDate
 from FE_Library import yearfrac
 
+
 def runExercise2():
+    """
+    This function executes the exercise 2
+    """
     # load EUROSTOXX_Dataset
-    file_csv = "EUROSTOXX50_Dataset.csv"
-    Dataset = pd.read_csv(file_csv)
+    Dataset = pd.read_csv("EUROSTOXX50_Dataset.csv")
 
     # name of columns useful for Portfolio 2
     columns_name_2 = ["Date", "BMWG.DE"]
@@ -60,11 +63,12 @@ def runExercise2():
 
     print('VaR with Full MC:')
     FullMCVaR = FullMonteCarloVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike, rate, dividend,
-    volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, NumberOfDaysPerYears, lambdaWHS)
+                                  volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha,
+                                  NumberOfDaysPerYears, lambdaWHS)
 
     print('VaR with Delta-normal method:')
-    DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike, rate, dividend,
-                       volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, NumberOfDaysPerYears,
-                        lambdaWHS)
+    DeltaNormal_VaR = DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike, rate, dividend,
+                                     volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha,
+                                     NumberOfDaysPerYears, lambdaWHS)
 
     return

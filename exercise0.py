@@ -4,10 +4,13 @@ from assignment4functions import AnalyticalNormalMeasures
 from assignment4functions import price_to_return
 from assignment4functions import SliceDataFromStartDate
 
+
 def runExercise0():
+    """
+    This function executes the exercise 0
+    """
     # load EUROSTOXX_Dataset
-    file_csv = "EUROSTOXX50_Dataset.csv"
-    Dataset = pd.read_csv(file_csv)
+    Dataset = pd.read_csv("EUROSTOXX50_Dataset.csv")
 
     # name of columns useful for exercise 0
     columns_name = ["Date", "ADSGn.DE", "ALVG.DE", "MUVGn.DE", "OREP.PA"]
@@ -19,7 +22,7 @@ def runExercise0():
     end_date = '2020-02-20'
     years = 5
     days_for_year = 365
-    time_frame = years*days_for_year + 1  # +1 because there's a bisestile year
+    time_frame = years*days_for_year + 1  # +1 because there's a leap year
     Dataset_0 = SliceDataFromStartDate(Dataset_0.copy(), end_date, time_frame)
 
     # create "matrix" of log-returns

@@ -3,16 +3,16 @@ import numpy as np
 from scipy.stats import t
 from scipy.stats import norm
 import math
-import random
+
 
 def SliceDataFromStartDate(data, endDate, duration):
     """
     SliceDataFromStartDate takes a dataframe and cuts it above start date of computation of risk measures
     and after the end date
-    :param data:
-    :param endDate:
-    :param duration:
-    :return:
+    :param data:          a given data-set
+    :param endDate:       the last date wanted
+    :param duration:      time window
+    :return: data:        the cut data-set
     """
 
     # reduce dataset up until the end date
@@ -29,8 +29,6 @@ def SliceDataFromStartDate(data, endDate, duration):
     # fill the NaN values with previous values
     data = data.ffill()
 
-    # Remove the date from the returns dataFrame and transform it to a numpy array
-    # data = data.iloc[:, 1:].apply(pd.to_numeric, errors='coerce')
     data = data.reset_index(drop=True)
 
     return data
@@ -93,9 +91,7 @@ def AnalyticalNormalMeasures(alpha, weights, portfolioValue, riskMeasureTimeInte
 def price_to_return(Dataset):
     """
     This function computes log returns from share prices.
-
     :param Dataset:                           share prices
-
     :return returns:                          log returns
     """
 
@@ -112,12 +108,14 @@ def HSMeasurements(returns, alpha, weights, portfolioValue, riskMeasureTimeInter
     """
     This function performs Historical Simulation measurements of Value at Risk and Expected Shortfall
 
-    :param returns:
-    :param alpha:
-    :param weights:
-    :param portfolioValue:
-    :param riskMeasureTimeIntervalInDay:
-    :return:
+    :param returns:                         returns' matrix
+    :param alpha:                           significance value
+    :param weights:                         portfolio weights
+    :param portfolioValue:                  notional
+    :param riskMeasureTimeIntervalInDay:    estimation interval in day
+
+    :return: ES:                            Expected Shortfall
+    :return: VaR:                           Value at Risk
     """
 
     # "Simulate" loss distribution
@@ -129,9 +127,9 @@ def HSMeasurements(returns, alpha, weights, portfolioValue, riskMeasureTimeInter
     n = len(loss)  # number of historical returns used --> "size" of loss distribution
     index = math.floor(n * (1 - alpha))  # index of the loss corresponding to VaR
 
-    VaR = math.sqrt(riskMeasureTimeIntervalInDay) * loss[index]
+    VaR = math.sqrt(riskMeasureTimeIntervalInDay) * loss[index-1]
     print('VaR:', VaR)
-    ES = math.sqrt(riskMeasureTimeIntervalInDay) * loss[0:index + 1].mean()
+    ES = math.sqrt(riskMeasureTimeIntervalInDay) * loss[0:index].mean()
     # mean value of the worst losses up to the VaR one
     print('ES:', ES)
 
@@ -144,10 +142,9 @@ def bootstrapStatistical(numberOfSamplesToBootstrap, returns):
 
     :param numberOfSamplesToBootstrap:      number of samples = M
     :param returns:                         time series of returns of assets in the portfolio
-                                            number of time observations = n
     :return: samples:                       indexes of returns that were sampled
     """
-    n = len(returns)
+    n = len(returns)  # number of time observations
     samples = np.array([np.random.randint(0, n - 1) for _ in range(numberOfSamplesToBootstrap)])
     return samples
 
@@ -162,8 +159,6 @@ def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasu
     :param weights:                         portfolio weights
     :param portfolioValue:                  notional
     :param riskMeasureTimeIntervalInDay:    estimation interval in day
-    :param returns:                         returns' matrix
-
     :return: ES:                            Expected Shortfall with WHS
     :return: VaR:                           Value at Risk with WHS
     """
@@ -177,15 +172,6 @@ def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasu
     # historical losses
     L = - portfolioValue * returns.iloc[:, 1:].to_numpy().dot(weights)
 
-    # simulation weights
-    # date = pd.to_datetime(returns.iloc[:, 0])
-
-    # last data
-    # last_date = date.iloc[-1]
-
-    # determine the yearfractions corresponding to the (business) dates of the returns
-    # yearfrac_vector = [yearfrac(data, last_date, 3) for data in date]
-
     # Compute the exponents for the lambda coefficients: decreasing in time
     lambdaExponent = np.arange(n - 1, -1, -1)
 
@@ -198,7 +184,7 @@ def WHSMeasurements(returns, alpha, lambda_P, weights, portfolioValue, riskMeasu
     # coordinates (x,y); then *sorted orders these pairs based on the ordering of the x value (so the losses L), and we
     # specified reverse=True to have the losses ordered from biggest to smallest; finally, the second zip "unzips" the
     # pairs and returns them as two separate vectors, but now they're ordered how we wanted and the relationship
-    # between losses and historical weights are mantained
+    # between losses and historical weights are maintained
 
     # find the index that satisfy the constraints
     # initialize index counter
@@ -263,15 +249,15 @@ def PrincCompAnalysis(yearlyCovariance, yearlyMeanReturns, weights, H, alpha, nu
     """
     this function calculates the VaR and the ES via a Gaussian parametric PCA approach
 
-    :param yearlyCovariance:
-    :param yearlyMeanReturns:
-    :param weights:
-    :param H:
-    :param alpha:
-    :param numberOfPrincipalComponents:
-    :param portfolioValue:
-    :return: ES:
-    :return: VaR:
+    :param yearlyCovariance:                matrix of yearly covariances of returns
+    :param yearlyMeanReturns:               vector of yearly means of returns
+    :param weights:                         weights of portfolio
+    :param H:                               estimation interval in fraction of years
+    :param alpha:                           confidence level
+    :param numberOfPrincipalComponents:     number of principal components to be analyzed
+    :param portfolioValue:                  value of portfolio
+    :return: ES:                            Expected Shortfall
+    :return: VaR:                           Value at Risk
     """
     # Compute VaR std and ES std for Gaussian distributed losses (as by assumption of PCA method)
     VaR_std = norm.ppf(alpha, loc=0, scale=1)
@@ -279,7 +265,7 @@ def PrincCompAnalysis(yearlyCovariance, yearlyMeanReturns, weights, H, alpha, nu
 
     # compute eigenvalues and eigenvectors
     eigenvalues, eigenvectors = np.linalg.eig(yearlyCovariance)
-    # order for decrescent eigenvalues
+    # order for decreasing eigenvalues
     eigenvalues, eigenvectors = zip(*sorted(zip(eigenvalues, eigenvectors.T), reverse=True))
     # zip functioning explained in WHS method
     eigenvalues = np.diag(eigenvalues)  # make eig into a diag matrix
@@ -292,13 +278,14 @@ def PrincCompAnalysis(yearlyCovariance, yearlyMeanReturns, weights, H, alpha, nu
     # mean and covariance for reduced form portfolio
     mu_rfp = sum((weights_hat * mu_hat)[:numberOfPrincipalComponents])
     sigma_rfp = sum(((weights_hat ** 2).dot(eigenvalues))[:numberOfPrincipalComponents])
+
+    # computation of VaR
     VaR = H * mu_rfp + math.sqrt(H) * math.sqrt(sigma_rfp) * VaR_std
     VaR_value = portfolioValue * VaR
-    print('VaR:', VaR_value)
 
+    # computation of ES
     ES = H * mu_rfp + math.sqrt(H) * math.sqrt(sigma_rfp) * ES_std
     ES_value = ES * portfolioValue
-    print('ES:', ES_value)
 
     return ES_value, VaR_value
 
@@ -308,22 +295,22 @@ def FullMonteCarloVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, str
     """
     Function to compute full Monte Carlo VaR of portfolio
 
-    :param logReturns:
-    :param numberOfShares:
-    :param numberOfCalls:
-    :param stockPrice:
-    :param strike:
-    :param rate:
-    :param dividend:
-    :param volatility:
-    :param timeToMaturityInYears:
-    :param riskMeasureTimeIntervalInYears:
-    :param alpha:
-    :param NumberOfDaysPerYears:
-    :param lambdaWHS:
-    :return:
+    :param logReturns:                          matrix of log-returns
+    :param numberOfShares:                      number of shares of stock held in portfolio
+    :param numberOfCalls:                       number of calls held in portfolio
+    :param stockPrice:                          price of stock
+    :param strike:                              strike value of calls
+    :param rate:                                fixed interest rate of stock
+    :param dividend:                            dividend yield of stock
+    :param volatility:                          volatility of stock
+    :param timeToMaturityInYears:               time to maturity of calls
+    :param riskMeasureTimeIntervalInYears:      estimation interval expressed in fraction of years
+    :param alpha:                               confidence level
+    :param NumberOfDaysPerYears:                business days considered per year
+    :param lambdaWHS:                           parameter for Weighted Historical Simulation
+    :return:VaR_WHS:                            Value at Risk
     """
-    #random.seed(40)  # for reproducibility of results reasons
+    # random.seed(40)  # for reproducibility of results reasons
 
     # Black-Scholes formula for Call price
     callPrice = blsCall(stockPrice, strike, rate, dividend, volatility, timeToMaturityInYears)
@@ -350,7 +337,7 @@ def FullMonteCarloVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, str
     regularWeights = C * lambdaWHS ** np.arange(nObs - 1, -1, -1)
     singleWeightsSims = regularWeights[indexes]
 
-    # Find the weights for each simulation computing the mean of its weights and then normalizing so they sum up to 1
+    # Find the weights for each simulation computing the mean of its weights and then normalizing, so they sum up to 1
     weightsSims = np.mean(singleWeightsSims, axis=1)  # for now, they're in the same order as the simulated prices
     weightsSims = weightsSims / np.sum(weightsSims)
 
@@ -394,24 +381,25 @@ def FullMonteCarloVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, str
     return VaR
 
 
-def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike, rate, dividend,
-                   volatility, timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, NumberOfDaysPerYears,
-                   lambdaWHS):
+def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike, rate, dividend, volatility,
+                   timeToMaturityInYears, riskMeasureTimeIntervalInYears, alpha, NumberOfDaysPerYears, lambdaWHS):
     """
     Function to compute full VaR of portfolio with Delta Normal method
-    :param logReturns:
-    :param numberOfShares:
-    :param numberOfCalls:
-    :param stockPrice:
-    :param strike:
-    :param rate:
-    :param dividend:
-    :param volatility:
-    :param timeToMaturityInYears:
-    :param riskMeasureTimeIntervalInYears:
-    :param alpha:
-    :param NumberOfDaysPerYears:
-    :return:
+
+    :param logReturns:                          matrix of log-returns
+    :param numberOfShares:                      number of shares of stock held in portfolio
+    :param numberOfCalls:                       number of calls held in portfolio
+    :param stockPrice:                          price of stock
+    :param strike:                              strike value of calls
+    :param rate:                                fixed interest rate of stock
+    :param dividend:                            dividend yield of stock
+    :param volatility:                          volatility of stock
+    :param timeToMaturityInYears:               time to maturity of calls
+    :param riskMeasureTimeIntervalInYears:      estimation interval expressed in fraction of years
+    :param alpha:                               confidence level
+    :param NumberOfDaysPerYears:                business days considered per year
+    :param lambdaWHS:                           parameter for Weighted Historical Simulation
+    :return:VaR_WHS:                            Value at Risk
     """
 
     # historical log returns in the past over the 10 days time lag
@@ -441,7 +429,7 @@ def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike
 
     # Loss total portfolio
     lossTotal = -(-numberOfCalls * deltaCall + numberOfShares) * stockPrice * logRetMC
-    # Now I have avector of total losses, which simulates the loss distribution, and I also have
+    # Now I have a vector of total losses, which simulates the loss distribution, and I also have
     # the corresponding weights of each observation stored in the weightsSims vector
 
     # Sorting the losses in decreasing order, using zip sorted (keeping relation with weights)
@@ -470,16 +458,17 @@ def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike
 def blsCall(stockPrice, strike, rate, dividend, volatility, timeToMaturityInYears):
     """
     Calculates the Call option price according to Black and Scholes formula
-    :param stockPrice:
-    :param strike:
-    :param rate:
-    :param dividend:
-    :param volatility:
-    :param timeToMaturityInYears:
-    :return:
+
+    :param stockPrice:              today's price of stock
+    :param strike:                  strike value of call
+    :param rate:                    fixed interest rate
+    :param dividend:                dividend yield of stock
+    :param volatility:              volatility of stock
+    :param timeToMaturityInYears:   time to maturity of call
+    :return: callPrice:             price of call option
     """
 
-    # Black-Scholes params d1 and d2
+    # Black-Scholes parameters d1 and d2
     d1 = (np.log(stockPrice / strike) + (rate - dividend + 0.5 * volatility ** 2) * timeToMaturityInYears) / (
             volatility * np.sqrt(timeToMaturityInYears))
     d2 = d1 - volatility * np.sqrt(timeToMaturityInYears)

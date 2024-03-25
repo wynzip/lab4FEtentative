@@ -8,10 +8,13 @@ from assignment4functions import plausibilityCheck
 from assignment4functions import SliceDataFromStartDate
 from assignment4functions import PrincCompAnalysis
 
+
 def runExercise1():
+    """
+    This function executes the exercise 1
+    """
     # load EUROSTOXX_Dataset
-    file_csv = "EUROSTOXX50_Dataset.csv"
-    Dataset = pd.read_csv(file_csv)
+    Dataset = pd.read_csv("EUROSTOXX50_Dataset.csv")
 
     print('Portfolio A')
 
@@ -60,6 +63,7 @@ def runExercise1():
     # check on the order of magnitude
     VaR_HS_ptf1_check = plausibilityCheck(returns_A, weights, alpha, portfolioValue_A, riskMeasureTimeIntervalInDay)
 
+    print('')
     ##############################################################################################################
     print('Portfolio B')
 
@@ -96,8 +100,10 @@ def runExercise1():
                                           riskMeasureTimeIntervalInDay_B)
 
     # check on the order of magnitude
-    VaR_WHS_ptf2_check = plausibilityCheck(returns_B, weights_B, alpha_B, portfolioValue_B, riskMeasureTimeIntervalInDay_B)
+    VaR_WHS_ptf2_check = plausibilityCheck(returns_B, weights_B, alpha_B, portfolioValue_B,
+                                           riskMeasureTimeIntervalInDay_B)
 
+    print('')
     ###########################################################################################################
     print('Portfolio C')
 
@@ -117,7 +123,6 @@ def runExercise1():
     days_for_year = 365
     time_frame = years * days_for_year + 1
     Dataset_C = SliceDataFromStartDate(Dataset_C.copy(), end_date, time_frame)
-
 
     # compute returns for Portfolio
     returns_C = price_to_return(Dataset_C.copy())
@@ -148,11 +153,13 @@ def runExercise1():
     print('Var and ES with principal component analysis')
     # number of principal components goes from 1 to 5
     for number_pc in range(1, 6):
-        print('number of principal components is', number_pc)
-        ES_C_PCA[number_pc-1], VaR_C_PCA[number_pc-1] = PrincCompAnalysis(cov_matrix, mean_vector, weights_C, H, alpha_C, number_pc, portfolioValue_C)
+        ES_C_PCA[number_pc-1], VaR_C_PCA[number_pc-1] = PrincCompAnalysis(cov_matrix, mean_vector, weights_C, H,
+                                                                          alpha_C, number_pc, portfolioValue_C)
 
-    print(VaR_C_PCA)
-    # check on the order of magnitude
+    print('VaR with number of components from 1 to 5:', VaR_C_PCA)
+    print('ES with number of components from 1 to 5:', ES_C_PCA)
+
+    # check on the order of magnitude on the VaR
     VaR_WHS_ptf2_check = plausibilityCheck(returns_C, weights_C, alpha_C, portfolioValue_C, H*buss_days_year)
 
     return
