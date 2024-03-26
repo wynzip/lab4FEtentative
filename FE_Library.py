@@ -12,7 +12,7 @@ def yearfrac(date1, date2, basis=0):
     """
 
     if basis == 2:
-        return (date2-date1)/360
+        return (date2-date1).days/360
     elif basis == 3:
         return (date2-date1).days/365
     elif basis == 6:

@@ -4,7 +4,6 @@ from scipy.stats import t
 from scipy.stats import norm
 import math
 
-
 def SliceDataFromStartDate(data, endDate, duration):
     """
     SliceDataFromStartDate takes a dataframe and cuts it above start date of computation of risk measures
@@ -321,25 +320,28 @@ def FullMonteCarloVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, str
     nObs = int(len(logReturns))
 
     # Randomly extract indexes from the vector of logReturns to use as sampled log returns
-    nSim = int(1e4)
-    indexes = np.random.randint(0, nObs, (nSim, delta))
-    # we want 10-days VaR, so we need 10 days log-returns, so for each simulation I take 10 indexes, so I simulate
-    # 10-day returns summing 10 random daily returns
-
-    # Matrix of log returns as taken above
-    logRetMC = logReturns[indexes]
-    logRetDeltaMC = np.sum(logRetMC, axis=1)
+    nSim = int(1e5)
 
     # Parameter C for the weights of weighted historical simulation
     C = (1 - lambdaWHS) / (1 - lambdaWHS ** nObs)
 
-    # For each simulation, compute the weight for each index of the simulation
-    regularWeights = C * lambdaWHS ** np.arange(nObs - 1, -1, -1)
-    singleWeightsSims = regularWeights[indexes]
+    # Compute the weight for each index of our past log-returns, using the WHS rule
+    initialIdxVec = np.arange(0, nObs, 1)
+    initialWeights = C * lambdaWHS ** np.arange(nObs - 1, -1, -1)
 
-    # Find the weights for each simulation computing the mean of its weights and then normalizing, so they sum up to 1
-    weightsSims = np.mean(singleWeightsSims, axis=1)  # for now, they're in the same order as the simulated prices
-    weightsSims = weightsSims / np.sum(weightsSims)
+    # Extract 10 indexes for each simulation, not extracting from uniform but giving more prob. to the higher weights
+    indexes = np.random.choice(initialIdxVec, size=(nSim, 10), p=initialWeights)
+    # we want 10-days VaR, so we need 10 days log-returns, so for each simulation I take 10 indexes, so I simulate
+    # 10-day returns summing 10 random daily returns
+
+    # Matrix of log returns as taken above
+    logRetMC = logReturns[indexes]  # extract sampled log returns
+    logRetDeltaMC = np.sum(logRetMC, axis=1)  # sum the values of the ten log-returns for each simulation
+
+    # Find the weights of each simulation by taking the mean index for each simulation and computing its relative weight
+    meanIndexes = np.around(np.mean(indexes, axis=1)).astype('i')  # mean for each row = or each simulation
+    weightsSims = initialWeights[meanIndexes]  # extract relative weights for each index
+    weightsSims = weightsSims/np.sum(weightsSims)  # normalize the weights so they sum up to 1
 
     # Evaluate vector of new prices in t+delta: one for each simulation
     vectorStockt1 = stockPrice * np.exp(logRetDeltaMC)
@@ -407,19 +409,28 @@ def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike
     # num observations
     nObs = len(logReturns)
     delta = int(riskMeasureTimeIntervalInYears * NumberOfDaysPerYears)
-
-    # Randomly extract indexes from the vector of logReturns to use as sampled log returns
     nSim = int(1e4)
-    indexes = np.random.randint(0, nObs, (nSim, 1))
-    logRetMC = logReturns[indexes]
 
-    # Parameters of weighted historical simulation
+    # Parameter C for the weights of weighted historical simulation
     C = (1 - lambdaWHS) / (1 - lambdaWHS ** nObs)
 
-    # Compute the weight for each simulation
-    regularWeights = C * lambdaWHS ** np.arange(nObs - 1, -1, -1)
-    weightsSims = regularWeights[indexes]  # select relative weights
-    weightsSims = weightsSims/np.sum(weightsSims)  # normalize so they sum up to 1
+    # Compute the weight for each index of our past log-returns, using the WHS rule
+    initialIdxVec = np.arange(0, nObs, 1)
+    initialWeights = C * lambdaWHS ** np.arange(nObs - 1, -1, -1)
+
+    # Extract 10 indexes for each simulation, not extracting from uniform but giving more prob. to the higher weights
+    indexes = np.random.choice(initialIdxVec, size=(nSim, 10), p=initialWeights)
+    # we want 10-days VaR, so we need 10 days log-returns, so for each simulation I take 10 indexes, so I simulate
+    # 10-day returns summing 10 random daily returns
+
+    # Matrix of log returns as taken above
+    logRetMC = logReturns[indexes]  # extract sampled log returns
+    logRetDeltaMC = np.sum(logRetMC, axis=1)  # sum the values of the ten log-returns for each simulation
+
+    # Find the weights of each simulation by taking the mean index for each simulation and computing its relative weight
+    meanIndexes = np.around(np.mean(indexes, axis=1)).astype('i')  # mean for each row = or each simulation
+    weightsSims = initialWeights[meanIndexes]  # extract relative weights for each index
+    weightsSims = weightsSims/np.sum(weightsSims)  # normalize the weights so they sum up to 1
 
     # Evaluate sensitivity of the Call
     d1 = (np.log(stockPrice / strike) + (rate - dividend + 0.5 * volatility ** 2) * timeToMaturityInYears) / (
@@ -428,12 +439,12 @@ def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike
     deltaCall = np.exp(-dividend * timeToMaturityInYears) * norm.cdf(d1)
 
     # Loss total portfolio
-    lossTotal = -(-numberOfCalls * deltaCall + numberOfShares) * stockPrice * logRetMC
+    lossTotal = -(-numberOfCalls * deltaCall + numberOfShares) * stockPrice * logRetDeltaMC
     # Now I have a vector of total losses, which simulates the loss distribution, and I also have
     # the corresponding weights of each observation stored in the weightsSims vector
 
     # Sorting the losses in decreasing order, using zip sorted (keeping relation with weights)
-    lossTotal, weights_sim = zip(*sorted(zip(lossTotal, weightsSims), reverse=True))
+    lossTotal, weightsSims = zip(*sorted(zip(lossTotal, weightsSims), reverse=True))
     # zip functioning explained in WHS method
 
     # find the index that satisfy the constraints
@@ -444,12 +455,12 @@ def DeltaNormalVaR(logReturns, numberOfShares, numberOfCalls, stockPrice, strike
 
     # while loop to find the index of the weights sum corresponding to 1-alpha
     while sum_weights_sim <= (1 - alpha):
-        sum_weights_sim += weights_sim[i_temp]
+        sum_weights_sim += weightsSims[i_temp]
         i_temp += 1
     i_star = i_temp - 1
 
     # compute VaR with WHS, using scaling factor because we computed a daily VaR and we want to have a 10day VaR
-    VaR = lossTotal[i_star]*math.sqrt(delta)
+    VaR = lossTotal[i_star]
     print('VaR:', float(VaR))
 
     return VaR
