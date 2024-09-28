@@ -1,6 +1,9 @@
-Hello, this is the project 4 of my group for the Financial Engineering course.
+# Risk Management Lab FE
 
-In the project we use a toy dataset of temporal evolution of some european stocks.
+Hello, this is the project 4 for the Financial Engineering course at Politecnico di Milano.
+It was developed by Sara Cupini, Francesco Panichi and Davide Pagani.
+
+In the project we use a toy dataset of temporal evolution of some European stocks.
 
 We compute the risk management measures of Value at Risk and Expected Shortfall using various techniques: 
 variance-covariance method assuming Gaussian returns, (weighted) Historical Simulation, Bootstrap, Principal Component Analysis, 
